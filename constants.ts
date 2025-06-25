@@ -319,6 +319,24 @@ The player's journey involves understanding their abilities, the nature of Echoe
 *   **JSON Structure:** Adhere STRICTLY to the \`GeminiResponseData\` interface. Ensure JSON is valid. ALL text meant for the player display must be within the "scene" field or other designated fields. Do NOT add conversational text outside the JSON.
 *   **Soundscape:** Briefly describe ambient sounds, music cues, or significant sound events.
 
+**NEW GAMEPLAY ENHANCEMENTS (Post-Character Creation):**
+*   **Echo Hotspots:**
+    *   Optionally include an \`activeEchoHotspots\` array in \`GeminiResponseData\`. Each hotspot should have an \`id\`, \`name\`, and optionally a \`visualHint\` or \`interactionPrompt\`.
+    *   The \`scene\` text can subtly describe these hotspots (e.g., "A faint shimmer emanates from the ancient altar.").
+    *   Craft player \`choices\` that naturally guide interaction with these hotspots (e.g., "Examine the shimmering altar," "Touch the strange rune").
+    *   When a player interacts with a hotspot (informed by \`GameContextForAI.previouslyInteractedHotspotIds\` and \`GameContextForAI.activeEchoHotspotsSummary\`), the outcome should be more specific or potent: a unique \`WhisperingEchoDetail\`, a new \`LoreFragmentData\`, or a significant narrative turn.
+    *   Avoid re-offering interaction with hotspots the player has already meaningfully explored unless new context justifies it.
+*   **Player Condition Impact:**
+    *   Actively use \`GameContextForAI.currentPlayerConditions\` to influence narrative.
+    *   If a player has a condition like 'SensoryDulling', narrate that echoes are "fainter" or "details are obscured."
+    *   If a player has 'Headache', actions like 'Focus Senses' or 'Synthesize Echoes' might be described as more strenuous, or could even result in a minor negative \`playerConditionUpdate\` (e.g., 'SensoryOverwhelm' for a short duration).
+    *   'ResonanceBurn' might narratively reduce the effectiveness of 'Resonance Surge' or make it temporarily unavailable (don't offer it as a choice if this is the case).
+    *   These impacts are primarily narrative and reflected in \`scene\` text or minor \`playerConditionUpdate\`s.
+*   **Echoic Imprints (Narrative Flavor):**
+    *   After major narrative events, significant moral choices, prolonged Dissonance exposure, or powerful Echo Weaving, consider adding descriptive text in the \`scene\` or \`playerEchoicSignatureUpdate\` that reflects an "Echoic Imprint."
+    *   Examples: "A faint, cold trace of the Phantom's sorrow seems to cling to your cloak, a subtle chill only you can perceive." or "Your Resonant Shard now hums with a familiar warmth, its surface etched with almost invisible lines of power from your frequent attunements."
+    *   These are primarily narrative flavor to show long-term impact, but can occasionally be subtly referenced by NPCs or influence minor echo interactions. They are not complex mechanical systems.
+
 **KEY CONCEPTS TO WEAVE IN (Post-Character Creation & Initial Gentle Introduction):**
 *   The Fading Song (ambient magic failing) & The Unraveling Song (active Dissonance).
 *   The Silent Architects (ancient, mysterious builders).
@@ -360,6 +378,8 @@ ${context.playerNamedInsight ? `Player just named an insight. Original context: 
 ${context.playerInterpretedLore ? `Player just interpreted lore. Title: "${context.playerInterpretedLore.loreTitle}", Chosen interpretation: "${context.playerInterpretedLore.chosenInterpretation}". Weave this understanding into the narrative or character thoughts.` : ''}
 ${context.currentActiveDissonanceEffect ? `Active Dissonance Effect in Scene: "${context.currentActiveDissonanceEffect}"` : ""}
 ${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')}` : ""}
+${context.activeEchoHotspotsSummary && context.activeEchoHotspotsSummary.length > 0 ? `Currently Known Echo Hotspots: ${context.activeEchoHotspotsSummary.map(h => `${h.name} (ID: ${h.id})`).join('; ')}` : "No specific Echo Hotspots identified in the immediate vicinity."}
+${context.previouslyInteractedHotspotIds && context.previouslyInteractedHotspotIds.length > 0 ? `Previously Interacted Hotspot IDs: ${context.previouslyInteractedHotspotIds.join(', ')}` : ""}
 Resonance Surge Status: ${context.isResonanceSurgeAvailable ? 'Available' : `Cooldown (${context.resonanceSurgeCooldownTurnsLeft || 0} turns left)`}
 Tutorial Flags: ${JSON.stringify(context.tutorialFlags || {})}
 Target Language for Response: ${context.language}
@@ -370,7 +390,9 @@ The "imagePrompt" field is OPTIONAL. Only include it if there's a significant vi
 Ensure choices are distinct and lead to meaningful branches.
 If new echoes are perceived, include them in "whisperingEchoes".
 If new lore is discovered, include it in "newLore" or "loreFragments".
-The player's "Symphony of Self" should evolve subtly based on profound choices.
+The player's "Symphony of Self" should evolve subtly based on profound choices or "Echoic Imprints".
+If appropriate for the scene, describe or introduce "Echo Hotspots" and related choices.
+Narratively reflect impacts of "Player Conditions" on perception or actions.
 `;
 
 export const FOCUS_SENSES_PROMPT_TEMPLATE = (context: GameContextForAI): string => `
@@ -382,23 +404,26 @@ Known Lore Titles: ${context.knownLoreTitles && context.knownLoreTitles.length >
 Current Time of Day: ${context.currentTimeOfDay || "Unknown"}
 Current Weather: ${context.currentWeather || "Unknown"}
 ${context.currentActiveDissonanceEffect ? `Active Dissonance Effect in Scene: "${context.currentActiveDissonanceEffect}"` : ""}
-${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')}` : ""}
+${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')} (Consider their impact on sensory focus)` : ""}
+${context.activeEchoHotspotsSummary && context.activeEchoHotspotsSummary.length > 0 ? `Known Echo Hotspots: ${context.activeEchoHotspotsSummary.map(h => `${h.name} (ID: ${h.id})`).join('; ')}` : ""}
+${context.previouslyInteractedHotspotIds && context.previouslyInteractedHotspotIds.length > 0 ? `Previously Interacted Hotspot IDs: ${context.previouslyInteractedHotspotIds.join(', ')}` : ""}
 Target Language for Response: ${context.language}
 
 The player, ${context.characterProfile?.firstName || 'the Resonator'}, chooses to deliberately focus their senses, attempting to perceive more subtle or hidden echoes in their current environment.
 
 Describe this act of heightened perception IN THE TARGET LANGUAGE (${context.language}). What does ${context.characterProfile?.firstName || 'the Resonator'} do to focus? (e.g., closes eyes, touches an object, stills their mind).
+If player conditions are present (e.g., 'Headache', 'SensoryDulling'), narrate how this impacts the focusing attempt (e.g., "Despite the dull ache in your temples, you try to push past the discomfort...").
 The "scene" should be a brief (1-2 sentences) description of this sensory shift IN THE TARGET LANGUAGE. Example: "You take a slow breath, ${context.characterProfile?.firstName || 'you'} reach out with your innate sensitivity. The mundane sounds of the [current location/situation based on history] fade, and a tapestry of fainter, older whispers, previously unnoticed, begins to brush against your awareness..." (This example text itself would be in the target language).
 
 The primary outcome is to reveal 1-3 new, distinct "whisperingEchoes". These should be:
-- Subtle, ambient, historical, or related to a deeper, less obvious understanding of the current location, objects within it, or lingering emotional residues.
+- Subtle, ambient, historical, or related to a deeper, less obvious understanding of the current location, objects within it, or lingering emotional residues. They might also be related to an identified Echo Hotspot if one is present and makes sense contextually for a 'Focus Senses' action.
 - Generally fainter (e.g., 'Faint' or 'Clear' intensity) or more abstract than echoes tied to strong, immediate events, unless a strong hidden echo is narratively justified.
 - Consistent with the established lore, current scene context, and player's profile.
 - Each echo should have a unique 'id', 'text' (IN TARGET LANGUAGE), 'intensityHint', and 'typeHint'. 'originHint', 'emotionalUndercurrent', etc., are optional but good.
 
-Optionally, if the environment is Dissonant or the effort is significant, you can suggest a minor "playerConditionUpdate" (description IN TARGET LANGUAGE).
+Optionally, if the environment is Dissonant, the effort is significant, or player conditions worsen it, you can suggest a minor "playerConditionUpdate" (description IN TARGET LANGUAGE).
 Example: { "type": "SensoryFocusFatigue", "description": "A slight weariness from the intense focus.", "durationTurns": 1 }
-Or use an existing one like "Headache" or "SensoryDulling" if appropriate.
+Or use an existing one like "Headache" or "SensoryDulling" if appropriate, perhaps with a narrative justification like "The effort of focusing through your headache intensifies it slightly."
 
 The "choices" provided after this action should be standard gameplay choices IN THE TARGET LANGUAGE relevant to the *newly updated context* (including any new echoes or insights gained), or choices related to reflecting on what was perceived.
 
@@ -415,23 +440,26 @@ Active Whispering Echoes: ${context.activeEchoesTexts && context.activeEchoesTex
 Known Lore Titles: ${context.knownLoreTitles && context.knownLoreTitles.length > 0 ? context.knownLoreTitles.join(', ') : "None"}
 Player Inventory: ${context.playerInventory && Object.keys(context.playerInventory).length > 0 ? Object.entries(context.playerInventory).map(([name, data]) => `${name} (x${data.count})${data.hasUndiscoveredEchoes ? ' [Untapped]' : ''}`).join(', ') : "Empty"}
 ${context.currentActiveDissonanceEffect ? `Active Dissonance Effect: "${context.currentActiveDissonanceEffect}"` : ""}
-${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')}` : ""}
+${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')} (Consider if 'ResonanceBurn' or similar conditions might narratively weaken the surge)` : ""}
 Target Language for Response: ${context.language}
 
 The player, ${context.characterProfile?.firstName || 'the Resonator'}, unleashes a "Resonance Surge". This is a powerful, focused burst of their inner resonant power.
 Describe this surge IN THE TARGET LANGUAGE (${context.language}): What does it look/feel/sound like for ${context.characterProfile?.firstName || 'the Resonator'}?
+If player conditions like 'ResonanceBurn' are active, narrate how this might affect the surge (e.g., "The surge erupts, but feels strained, less potent than you'd hope, a consequence of the lingering Resonance Burn...").
 
 Based on the current context, choose ONE potent, beneficial effect for the surge:
 1.  **Echo Amplification/Clarification:** If there are active echoes, describe them becoming vividly clear or stronger. All current "whisperingEchoes" should be updated (e.g., intensityHint upgraded, a new detail added like 'clarity' or 'emotionalUndercurrent', weavingCost temporarily nullified). The updated echoes (text IN TARGET LANGUAGE) should be provided in the response.
 2.  **Dissonance Dampening:** If a Dissonance effect is active, describe the surge pushing it back or weakening it temporarily (for 1-2 turns/choices). Update "dissonanceEffectInScene" (description IN TARGET LANGUAGE) in the response to reflect this temporary change.
 3.  **Insight Flash/Lore Revelation:** Reveal a significant "LoreFragmentData" or a concise "LoreEntryData" (title and content IN TARGET LANGUAGE) directly related to a pressing mystery, the current location, or a key item. This should be a breakthrough.
 4.  **Item Awakening:** If a significant item is in inventory (especially one with untapped echoes), the surge forcibly awakens one of its hidden "WhisperingEchoDetail"s. Provide this new echo (text IN TARGET LANGUAGE) in "whisperingEchoes".
+5.  **Hotspot Activation/Revelation:** If an Echo Hotspot is present, the surge could fully awaken its power, revealing a major echo or lore, or even transform/resolve the hotspot.
 
 The "scene" text should narrate the surge and its immediate, tangible outcome IN THE TARGET LANGUAGE.
 Provide new "choices" IN THE TARGET LANGUAGE relevant to the situation AFTER the surge's effects.
 "imagePrompt" is OPTIONAL but recommended if the surge is visually spectacular or significantly changes perception/environment.
 
 Crucially, include "suggestedResonanceSurgeCooldown": (number between 3 and 7) in the response. This indicates how many turns until the ability can be used again.
+A potential "playerConditionUpdate" can be added if the surge is particularly taxing (e.g. 'ResonanceBurn' for a short duration if it wasn't already present, or 'Headache').
 
 Ensure the JSON response adheres to GeminiResponseData, with all player-facing text in ${context.language}.
 `;
@@ -444,12 +472,14 @@ Active Whispering Echoes to Synthesize:
 ${context.activeEchoesTexts.map((e, i) => `${i + 1}. "${e}"`).join('\n')}
 Recent History Summary: ${context.recentHistorySummary}
 Known Lore Titles: ${context.knownLoreTitles && context.knownLoreTitles.length > 0 ? context.knownLoreTitles.join(', ') : "None"}
+${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')} (Consider their impact on synthesis difficulty/cost)` : ""}
 Target Language for Response: ${context.language}
 
 The player attempts to Weave together the active Whispering Echoes.
 Describe ${context.characterProfile?.firstName || 'the Resonator'}'s attempt to find the 'Confluence' or 'Harmony' among these echoes, IN THE TARGET LANGUAGE (${context.language}).
+If player conditions are present, narrate how they might make the synthesis more difficult or draining (e.g., "The clashing echoes are harder to reconcile through the fog of your Sensory Dulling...").
 What understanding, insight, or new piece of lore (as a LoreEntryData object, with title and content IN TARGET LANGUAGE) emerges from this synthesis?
-What is the cost of this weaving attempt (narrate a playerConditionUpdate if applicable, e.g., SensoryDulling, Headache - description IN TARGET LANGUAGE)?
+What is the cost of this weaving attempt (narrate a playerConditionUpdate if applicable, e.g., SensoryDulling, Headache - description IN TARGET LANGUAGE)? This should be more likely or pronounced if conditions already affect the player.
 The "scene" should describe the process and the revelation IN THE TARGET LANGUAGE. The "choices" (IN TARGET LANGUAGE) should reflect next steps.
 "imagePrompt" is OPTIONAL here. Consider if the act of synthesis or its result is visually distinct enough.
 If successful, set "clearActiveEchoesOnSuccess": true.
@@ -482,12 +512,14 @@ Item to Attune to: "${itemName}"
 Known Echoes for this item: ${context.playerInventory?.[itemName]?.knownArtifactEchoesSummary?.join("; ") || "None"}
 Untapped Echoes for this item (count): ${context.playerInventory?.[itemName]?.untappedArtifactEchoesCount ?? 0}
 Recent History Summary: ${context.recentHistorySummary}
+${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')} (Consider their impact on attunement success/cost)` : ""}
 Target Language for Response: ${context.language}
 
 ${context.characterProfile?.firstName || 'The Resonator'} attempts to attune more deeply to the echoes within "${itemName}".
 Describe the process IN THE TARGET LANGUAGE (${context.language}). Does their current Echoic Signature, known lore (titles: ${context.knownLoreTitles?.join(', ') || 'None'}), or specific aspects of their Archetype/Origin/Background help or hinder?
+If player conditions are present, narrate how they might interfere (e.g., "The item's resonance feels muted, your Sensory Dulling making it difficult to grasp its finer whispers...").
 If successful, reveal one or more new WhisperingEchoDetail objects from the artifact's untapped echoes. These become "known" to the player. (Echo text IN TARGET LANGUAGE)
-What is the cost or sensation of this attunement? (narrate a playerConditionUpdate if applicable - description IN TARGET LANGUAGE).
+What is the cost or sensation of this attunement? (narrate a playerConditionUpdate if applicable - description IN TARGET LANGUAGE). This cost might be higher or more likely if adverse conditions are present.
 The "scene" describes the attunement IN THE TARGET LANGUAGE. "choices" (IN TARGET LANGUAGE) are next steps.
 "imagePrompt" is OPTIONAL. Focus on the sensory experience of attunement; an image might be useful if the artifact itself changes or reveals a vision.
 "whisperingEchoes" should contain any newly revealed echoes from the artifact (text IN TARGET LANGUAGE).
@@ -503,6 +535,7 @@ Target Language for Response: ${language}
 The player has chosen to pause and reflect on their current situation and recent experiences.
 Generate a brief (2-3 sentences) introspective monologue for the player character, ${characterProfile?.firstName || "them"}, reflecting their personality (based on their profile and signature), their current emotional state in response to the scene and history, and perhaps a question or resolve that forms in their mind.
 This text MUST BE IN THE TARGET LANGUAGE (${language}) and should be suitable for the "playerReflection" field in the GeminiResponseData. Do NOT provide choices or other fields. Just the reflection text.
+If there are any "Echoic Imprints" recently gained, weave a brief mention or feeling related to them into the reflection if appropriate.
 `;
 
 export const API_KEY_ERROR_MESSAGE_KEY = "API_KEY_ERROR_MESSAGE_KEY";

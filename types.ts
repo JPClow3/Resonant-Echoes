@@ -57,7 +57,7 @@ export interface HistoryEntry {
   choiceMade?: string;
   timestamp: string;
   fullSceneText: string;
-  type: 'story' | 'choice' | 'named_insight' | 'reflection' | 'lore_synthesis' | 'artifact_attunement' | 'echo_weaving_cost' | 'dissonance_encounter' | 'character_creation' | 'focused_perception' | 'resonance_surge';
+  type: 'story' | 'choice' | 'named_insight' | 'reflection' | 'lore_synthesis' | 'artifact_attunement' | 'echo_weaving_cost' | 'dissonance_encounter' | 'character_creation' | 'focused_perception' | 'resonance_surge' | 'hotspot_interaction';
 }
 
 export interface FactionUpdate {
@@ -161,6 +161,16 @@ export interface PlayerNote {
   title: string;
   content: string;
   timestamp: string;
+  tags?: string[];
+  linkedLoreIds?: string[];
+}
+
+export interface EchoHotspot {
+  id: string; // Unique ID for this hotspot instance in the scene
+  name: string; // Name of the hotspot, e.g., "Ancient Shrine Carving"
+  description?: string; // Optional longer description if AI provides
+  visualHint?: string; // Text hint for UI if we decide to add visual cues, e.g., "faintly glows"
+  interactionPrompt?: string; // Suggested text for a choice, e.g., "Examine the glowing carving"
 }
 
 export interface GeminiResponseData {
@@ -207,6 +217,7 @@ export interface GeminiResponseData {
   devouringSilenceZoneInScene?: DevouringSilenceZone;
   observedFloraFauna?: ResonanceFloraFauna[];
   architecturalDetails?: ArchitecturalEchoDetail;
+  activeEchoHotspots?: EchoHotspot[]; // New for Echo Hotspots
 
   // Resonance Surge
   suggestedResonanceSurgeCooldown?: number;
@@ -264,6 +275,7 @@ export interface GameState {
   echoicBlightInScene?: EchoicBlight | null;
   activeMemoryPhantoms: MemoryPhantom[];
   devouringSilenceZoneInScene?: DevouringSilenceZone | null;
+  activeEchoHotspots?: EchoHotspot[]; // New for Echo Hotspots
 
   // Player Notes
   playerNotes: PlayerNote[];
@@ -328,7 +340,9 @@ export interface GameContextForAI {
     chosenInterpretation: string;
   };
   currentActiveDissonanceEffect?: string | null;
-  currentPlayerConditions?: string[];
+  currentPlayerConditions?: string[]; // Array of condition descriptions
+  activeEchoHotspotsSummary?: { id: string, name: string }[]; // Summary of currently known hotspots
+  previouslyInteractedHotspotIds?: string[]; // IDs of hotspots already interacted with
   isResonanceSurgeAvailable?: boolean; // Let AI know if it's usable
   resonanceSurgeCooldownTurnsLeft?: number;
 

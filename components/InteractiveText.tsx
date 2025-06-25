@@ -74,8 +74,8 @@ const InteractiveText: React.FC<InteractiveTextProps> = ({ text, className = "",
         const tipText = match[2];
         const keywordText = match[3];
         parts.push(
+          // Key will be assigned in the final map
           <span
-            key={`${lastIndex}-lore`}
             className="lore-keyword"
           >
             {keywordText}
@@ -86,7 +86,8 @@ const InteractiveText: React.FC<InteractiveTextProps> = ({ text, className = "",
         const toneStyleName = match[5];
         const toneText = match[6];
         parts.push(
-          <span key={`${lastIndex}-tone`} className={`tone-${toneStyleName.toLowerCase()}`}>
+          // Key will be assigned in the final map
+          <span className={`tone-${toneStyleName.toLowerCase()}`}>
             {toneText}
           </span>
         );

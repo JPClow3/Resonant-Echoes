@@ -6,7 +6,8 @@ import {
   WhisperingEchoDetail, LoreEntryData, LoreFragmentData, HistoryEntry,
   GeminiResponseData, GameState, GameContextForAI, GamePhase,
   PlayerInventoryItem, DissonanceEffect, PlayerTemporaryCondition,
-  ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile, PlayerNote
+  ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile, PlayerNote,
+  EchoHotspot
 } from './types';
 
 import {
@@ -14,8 +15,8 @@ import {
   PLACEHOLDER_HOME_SCREEN_IMAGE_URL, CORE_SYSTEM_INSTRUCTION,
   CONTINUE_GAME_PROMPT_TEMPLATE, SYNTHESIZE_ECHOES_PROMPT_TEMPLATE,
   SYNTHESIZE_LORE_FRAGMENTS_PROMPT_TEMPLATE, ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE,
-  REQUEST_PLAYER_REFLECTION_PROMPT_TEMPLATE, API_KEY_ERROR_MESSAGE_KEY, // Changed
-  GENERIC_API_ERROR_MESSAGE_KEY, // Changed
+  REQUEST_PLAYER_REFLECTION_PROMPT_TEMPLATE, API_KEY_ERROR_MESSAGE_KEY,
+  GENERIC_API_ERROR_MESSAGE_KEY,
   HOME_SCREEN_IMAGE_PROMPT,
   ARCHETYPES_DATA, ORIGINS_DATA, BACKGROUNDS_DATA,
   CHARACTER_CREATION_INTRO_PROMPT, ARCHETYPE_SELECTED_PROMPT_TEMPLATE,
@@ -40,6 +41,7 @@ import SettingsPanel from './components/SettingsPanel';
 import DreamRumorDisplay from './components/DreamRumorDisplay';
 import LoreInterpretationModal from './components/LoreInterpretationModal';
 import PlayerNotesModal from './components/PlayerNotesModal';
+import IntroVideoPlayer from './components/IntroVideoPlayer'; // Import the new component
 
 const soundService = {
     playMusic: (key: string, options?: { volume?: number, loop?: boolean }) => console.log(`Playing music ${key}`, options),
@@ -55,6 +57,8 @@ const translations = {
   "Resonant Echoes": { en: "Resonant Echoes", pt: "Ecos Ressonantes" },
   "Settings": { en: "Settings", pt: "Opções" },
   "Cancel": { en: "Cancel", pt: "Cancelar" },
+  "Skip Intro": { en: "Skip Intro", pt: "Pular Introdução" },
+
 
   // HomeScreen
   "Enter the world of Resonant Echoes, where history breathes and your choices shape reality.": { en: "Enter the world of Resonant Echoes, where history breathes and your choices shape reality.", pt: "Entre no mundo de Ecos Ressonantes, onde a história respira e suas escolhas moldam a realidade." },
@@ -76,7 +80,7 @@ const translations = {
   "Tome ({count})": { en: "Tome ({count})", pt: "Tomo ({count})" },
   "Path Taken ({count})": { en: "Path Taken ({count})", pt: "Caminho Percorrido ({count})" },
   "My Journal ({count})": { en: "My Journal ({count})", pt: "Meu Diário ({count})" },
-  
+
   // App.tsx - ErrorDisplay
   "A Dissonant Chord!": { en: "A Dissonant Chord!", pt: "Uma Corda Dissonante!" },
   "Return to Safety": { en: "Return to Safety", pt: "Retornar à Segurança" },
@@ -91,7 +95,7 @@ const translations = {
   // App.tsx - NameInput for Character Creation
   "Enter Your Name:": { en: "Enter Your Name:", pt: "Insira Seu Nome:" },
   "Claim Your Name": { en: "Claim Your Name", pt: "Reivindicar Seu Nome" },
-  
+
   // App.tsx - Footer
   "Resonant Echoes. Created with Gemini & React.": { en: "Resonant Echoes. Created with Gemini & React.", pt: "Ecos Ressonantes. Criado com Gemini & React." },
   "Fonts: MedievalSharp & EB Garamond by Google Fonts.": { en: "Fonts: MedievalSharp & EB Garamond by Google Fonts.", pt: "Fontes: MedievalSharp & EB Garamond por Google Fonts." },
@@ -172,6 +176,14 @@ const translations = {
   "Confirm Deletion": { en: "Confirm Deletion", pt: "Confirmar Exclusão" },
   "Are you sure you want to delete this journal entry? This action cannot be undone.": { en: "Are you sure you want to delete this journal entry? This action cannot be undone.", pt: "Tem certeza que deseja excluir esta entrada do diário? Esta ação não pode ser desfeita." },
   "Delete Entry": { en: "Delete Entry", pt: "Excluir Entrada" },
+  "Tags (comma-separated):": { en: "Tags (comma-separated):", pt: "Tags (separadas por vírgula):" },
+  "E.g., #Theron, #ArchitectMystery, #Heartstone": { en: "E.g., #Theron, #ArchitectMystery, #Heartstone", pt: "Ex: #Theron, #MisterioArquiteto, #PedraCerne" },
+  "Linked Lore IDs (comma-separated):": { en: "Linked Lore IDs (comma-separated):", pt: "IDs de Lore Vinculados (separados por vírgula):" },
+  "E.g., lore_ancient_ritual, lore_theron_warning_1": { en: "E.g., lore_ancient_ritual, lore_theron_warning_1", pt: "Ex: lore_ritual_antigo, lore_aviso_theron_1" },
+  "Tags:": { en: "Tags:", pt: "Tags:" },
+  "Linked Lore:": { en: "Linked Lore:", pt: "Lore Vinculado:" },
+  "Note content cannot be empty.": { en: "Note content cannot be empty.", pt: "O conteúdo da nota não pode estar vazio." },
+
 
   // LoreInterpretationModal
   "Interpret the Ancient Lore": { en: "Interpret the Ancient Lore", pt: "Interprete a Sabedoria Antiga" },
@@ -214,8 +226,8 @@ const translations = {
   "Awakening the echoes...": { en: "Awakening the echoes...", pt: "Despertando os ecos..." },
 
   // constants.ts messages (will be objects there)
-  [GENERIC_API_ERROR_MESSAGE_KEY]: { 
-    en: "A Dissonant chord struck the Weave! An unexpected error occurred. Try a different path or restart if whispers persist.", 
+  [GENERIC_API_ERROR_MESSAGE_KEY]: {
+    en: "A Dissonant chord struck the Weave! An unexpected error occurred. Try a different path or restart if whispers persist.",
     pt: "Uma corda dissonante atingiu a Trama! Um erro inesperado ocorreu. Tente um caminho diferente ou reinicie se os sussurros persistirem."
   },
   [API_KEY_ERROR_MESSAGE_KEY]: {
@@ -252,15 +264,17 @@ type Action =
   | { type: 'SET_NEWEST_LORE_ID'; payload: string | null }
   // Player Notes Actions
   | { type: 'TOGGLE_PLAYER_NOTES_MODAL' }
-  | { type: 'ADD_PLAYER_NOTE'; payload: { title: string; content: string } }
+  | { type: 'ADD_PLAYER_NOTE'; payload: { title: string; content: string; tags?: string[]; linkedLoreIds?: string[] } }
   | { type: 'UPDATE_PLAYER_NOTE'; payload: PlayerNote }
   | { type: 'DELETE_PLAYER_NOTE'; payload: { id: string } }
   // Resonance Surge Actions
   | { type: 'RESONANCE_SURGE_INITIATED' }
-  | { type: 'RESONANCE_SURGE_COMPLETED'; payload: { responseData: GeminiResponseData } } 
-  | { type: 'DECREMENT_COOLDOWNS' } 
+  | { type: 'RESONANCE_SURGE_COMPLETED'; payload: { responseData: GeminiResponseData } }
+  | { type: 'DECREMENT_COOLDOWNS' }
   // Language Actions
-  | { type: 'SET_LANGUAGE'; payload: 'en' | 'pt' };
+  | { type: 'SET_LANGUAGE'; payload: 'en' | 'pt' }
+  // Echo Hotspot Action
+  | { type: 'ADD_INTERACTED_HOTSPOT'; payload: string };
 
 
 const initialGameState: GameState = {
@@ -278,10 +292,22 @@ const initialGameState: GameState = {
     playerInventory: {}, lastChosenChoiceIndex: null, currentRumors: [], dreamOrVisionToDisplay: null,
     awaitingLoreInterpretation: false, loreToInterpret: undefined, activeDissonanceEffect: null,
     playerConditions: [], echoicBlightInScene: null, activeMemoryPhantoms: [], devouringSilenceZoneInScene: null,
-    playerNotes: [], showPlayerNotesModal: false, 
+    activeEchoHotspots: [], // Initialize activeEchoHotspots
+    playerNotes: [], showPlayerNotesModal: false,
     isResonanceSurgeAvailable: true, resonanceSurgeCooldown: 0,
     currentLanguage: 'en',
 };
+
+// Helper function for gameReducer
+const updatePlayerConditions = (currentConditions: PlayerTemporaryCondition[], isSurgeEffect?: boolean): PlayerTemporaryCondition[] => {
+    if (isSurgeEffect) return currentConditions; // Don't decrement if surge just happened
+
+    return currentConditions.map(cond => ({
+        ...cond,
+        durationTurns: cond.durationTurns ? cond.durationTurns - 1 : undefined,
+    })).filter(cond => cond.durationTurns === undefined || cond.durationTurns > 0);
+};
+
 
 const gameReducer = (state: GameState, action: Action): GameState => {
   switch (action.type) {
@@ -295,11 +321,13 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         const defaultInitialState = {
             ...initialGameState,
             apiKeyMissing: !process.env.API_KEY,
-            homeScreenImageUrl: state.homeScreenImageUrl, 
+            homeScreenImageUrl: state.homeScreenImageUrl,
             currentVolume: state.currentVolume,
             isMuted: state.isMuted,
             isColorBlindAssistActive: state.isColorBlindAssistActive,
-            currentLanguage: action.payload.currentLanguage || state.currentLanguage, 
+            currentLanguage: action.payload.currentLanguage || state.currentLanguage,
+            playerNotes: [], // Reset player notes
+            activeEchoHotspots: [], // Reset hotspots
         };
       return { ...defaultInitialState, ...action.payload };
     case 'START_GAME_FLOW_SUCCESS':
@@ -308,8 +336,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         ...action.payload,
         isLoading: false,
         error: null,
-        currentImagePrompt: null, 
+        currentImagePrompt: null,
         currentImageUrl: null,
+        activeEchoHotspots: [],
       };
     case 'UPDATE_CHARACTER_CREATION_STEP':
       return {
@@ -347,6 +376,7 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         gameStarted: true,
         currentTimeOfDay: R1.currentTimeOfDay || "Dawn",
         currentWeather: R1.currentWeather || "Clear",
+        activeEchoHotspots: R1.activeEchoHotspots || [],
       };
     case 'PROCESS_AI_RESPONSE':
       const { responseData: R, isSurgeEffect } = action.payload;
@@ -379,24 +409,24 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       if (R.playerConditionUpdate) {
         currentConditions = [...currentConditions.filter(c => c.type !== R.playerConditionUpdate!.type), R.playerConditionUpdate];
         soundService.playSound('PLAYER_CONDITION_UPDATE');
-      } else {
-        currentConditions = currentConditions.map(cond => ({
-          ...cond,
-          durationTurns: cond.durationTurns ? cond.durationTurns - 1 : undefined,
-        })).filter(cond => cond.durationTurns === undefined || cond.durationTurns > 0);
       }
-      
+      currentConditions = updatePlayerConditions(currentConditions, isSurgeEffect);
+
+
       let newCooldown = state.resonanceSurgeCooldown;
       let surgeAvailable = state.isResonanceSurgeAvailable;
+
       if (!isSurgeEffect && state.resonanceSurgeCooldown > 0) {
         newCooldown = state.resonanceSurgeCooldown - 1;
-        if (newCooldown <= 0) { // Check for less than or equal to handle potential edge cases
-          newCooldown = 0; // Ensure it doesn't go negative
-          surgeAvailable = true;
-          soundService.playSound('SURGE_READY');
+      }
+      if (newCooldown <= 0) {
+        newCooldown = 0;
+        if (!state.isResonanceSurgeAvailable) {
+             surgeAvailable = true;
+             soundService.playSound('SURGE_READY');
         }
       }
-      
+
       return {
         ...state,
         isLoading: false,
@@ -419,6 +449,7 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         currentRumors: R.rumorMillUpdate ? [...state.currentRumors, R.rumorMillUpdate].slice(-5) : state.currentRumors,
         activeDissonanceEffect: R.dissonanceEffectInScene !== undefined ? R.dissonanceEffectInScene : state.activeDissonanceEffect,
         playerConditions: currentConditions,
+        activeEchoHotspots: R.activeEchoHotspots || [], // Update active hotspots
         insightToName: R.namedInsightContext ? R.namedInsightContext : null,
         awaitingLoreInterpretation: !!R.interpretiveChoicesForLore,
         loreToInterpret: R.interpretiveChoicesForLore || undefined,
@@ -426,7 +457,17 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         resonanceSurgeCooldown: isSurgeEffect ? (R.suggestedResonanceSurgeCooldown || 5) : newCooldown,
       };
     case 'ADD_HISTORY_ENTRY':
+      // Check if this history entry corresponds to a hotspot interaction
+      let newPreviouslyInteracted = state.historyLog.filter(h => h.type === 'hotspot_interaction').map(h => h.choiceMade?.split(':')[0].trim() || ''); // Rebuild or add based on type
+      if (action.payload.type === 'hotspot_interaction' && action.payload.choiceMade) {
+        const hotspotId = action.payload.choiceMade.split(':')[0].trim(); // Assuming choiceMade is "hotspotId: Actual choice text"
+        if (hotspotId && !newPreviouslyInteracted.includes(hotspotId)) {
+          newPreviouslyInteracted = [...newPreviouslyInteracted, hotspotId];
+        }
+      }
       return { ...state, historyLog: [...state.historyLog, action.payload] };
+    case 'ADD_INTERACTED_HOTSPOT': // Deprecated this direct action, handled via ADD_HISTORY_ENTRY with type 'hotspot_interaction'
+        return state; // No direct change, ID tracking managed via history entry
     case 'SET_LAST_CHOSEN_INDEX':
       return { ...state, lastChosenChoiceIndex: action.payload };
     case 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY':
@@ -464,6 +505,8 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         title: action.payload.title,
         content: action.payload.content,
         timestamp: new Date().toISOString(),
+        tags: action.payload.tags || [],
+        linkedLoreIds: action.payload.linkedLoreIds || [],
       };
       return { ...state, playerNotes: [newNote, ...state.playerNotes] };
     case 'UPDATE_PLAYER_NOTE':
@@ -480,20 +523,22 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       };
     case 'RESONANCE_SURGE_INITIATED':
       return { ...state, isLoading: true };
-    case 'RESONANCE_SURGE_COMPLETED': 
-      return state; 
-    case 'DECREMENT_COOLDOWNS': 
+    case 'RESONANCE_SURGE_COMPLETED': // This action itself doesn't change state; PROCESS_AI_RESPONSE does.
+      return state;
+    case 'DECREMENT_COOLDOWNS': // This was unused, repurposed for Process AI Response
       return state;
     case 'SET_LANGUAGE':
       return {
         ...initialGameState,
         apiKeyMissing: state.apiKeyMissing,
-        homeScreenImageUrl: state.homeScreenImageUrl, 
+        homeScreenImageUrl: state.homeScreenImageUrl,
         currentVolume: state.currentVolume,
         isMuted: state.isMuted,
         isColorBlindAssistActive: state.isColorBlindAssistActive,
         currentLanguage: action.payload,
-        gameStarted: false, 
+        gameStarted: false,
+        playerNotes: [], // Reset notes on language change
+        activeEchoHotspots: [], // Reset hotspots
       };
     default:
       return state;
@@ -510,33 +555,35 @@ type FetchGameDataFn = (
 
 const App: React.FC = () => {
   const [gameState, dispatch] = useReducer(gameReducer, initialGameState);
-  const [currentPhase, setCurrentPhase] = useState<GamePhase>(
-    !process.env.API_KEY ? GamePhase.Error : GamePhase.HomeScreen
-  );
+  const [currentPhase, setCurrentPhase] = useState<GamePhase>(GamePhase.HomeScreen);
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>('light');
   const [newLoreForGlow, setNewLoreForGlow] = useState(false);
   const [isReflecting, setIsReflecting] = useState(false);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
 
+  const [showIntroVideo, setShowIntroVideo] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('hasPlayedIntro');
+    }
+    return true;
+  });
+
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const lang = gameState.currentLanguage;
-    // Special handling for error message keys from constants.ts
     if (key === GENERIC_API_ERROR_MESSAGE_KEY || key === API_KEY_ERROR_MESSAGE_KEY) {
         const messageSet = translations[key as keyof typeof translations] as unknown as { en: string; pt: string; };
          if (!messageSet) {
             console.warn(`Translation key "${key}" not found in special error handling.`);
-            return key; // Fallback to key
+            return key;
         }
         let translatedMsg = messageSet[lang] || messageSet['en'] || key;
-        // Parameter substitution for error messages is not typical but can be added if needed
         return translatedMsg;
     }
-
 
     const translationSet = translations[key as keyof typeof translations] as { en: string; pt: string; };
     if (!translationSet) {
       console.warn(`Translation key "${key}" not found.`);
-      return key; // Fallback to key
+      return key;
     }
     let translatedString = translationSet[lang] || translationSet['en'] || key;
 
@@ -607,7 +654,7 @@ const App: React.FC = () => {
     if (prompt === gameState.currentImagePrompt && gameState.currentImageUrl && !gameState.currentImageUrl.startsWith('https://picsum.photos')) return;
 
     console.log("Fetching image for prompt:", prompt);
-    dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: null, prompt } }); 
+    dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: null, prompt } });
 
     try {
       const contextualPrompt = `Epic fantasy art, ${prompt}. Style influenced by: ${gameState.currentWeather}, ${gameState.currentTimeOfDay}. Player signature: ${gameState.playerEchoicSignature}. Current scene context: ${gameState.currentScene.substring(0, 100)}. ${gameState.activeDissonanceEffect ? "Dissonance effect: " + gameState.activeDissonanceEffect.description : ""}`;
@@ -629,7 +676,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Error fetching image:", error);
       dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt } });
-      dispatch({ type: 'SET_ERROR', payload: "Failed to generate scene image. Displaying placeholder." }); // This text could be translated too.
+      dispatch({ type: 'SET_ERROR', payload: "Failed to generate scene image." });
     }
   }, [ai.models, gameState.currentImagePrompt, gameState.currentImageUrl, gameState.currentTimeOfDay, gameState.currentWeather, gameState.playerEchoicSignature, gameState.currentScene, gameState.activeDissonanceEffect]);
 
@@ -650,9 +697,12 @@ const App: React.FC = () => {
         dispatch({ type: 'SET_HOME_SCREEN_IMAGE', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, loading: false } });
       }
     } catch (error) {
-      console.error("Error fetching home screen image:", error);
+      // The 'error' variable might be a string or an object.
+      // The UI will show "Failed to load title screen image."
+      // This console log is for developer detail.
+      console.error(`Detailed error fetching home screen image: ${error}. Fallback: Using placeholder image. UI Message: "Failed to load title screen image."`);
       dispatch({ type: 'SET_HOME_SCREEN_IMAGE', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, loading: false } });
-      dispatch({ type: 'SET_ERROR', payload: "Failed to load title screen image." }); // Could be translated
+      dispatch({ type: 'SET_ERROR', payload: "Failed to load title screen image." });
     }
   }, [ai.models, gameState.homeScreenImageUrl, gameState.isHomeScreenImageLoading, gameState.homeScreenImageFetchAttempted]);
 
@@ -675,6 +725,12 @@ const App: React.FC = () => {
         };
       }
     }
+    
+    const previouslyInteractedHotspotIds = Array.from(new Set(
+        gameState.historyLog
+          .filter(h => h.type === 'hotspot_interaction' && h.choiceMade)
+          .map(h => h.choiceMade!.split(':')[0].trim()) // Assumes format "hotspotId: Choice Text"
+      ));
 
     return {
       characterProfile: gameState.characterProfile ? {
@@ -698,6 +754,8 @@ const App: React.FC = () => {
       currentRumors: gameState.currentRumors,
       currentActiveDissonanceEffect: gameState.activeDissonanceEffect?.description || null,
       currentPlayerConditions: gameState.playerConditions.map(c => c.description),
+      activeEchoHotspotsSummary: gameState.activeEchoHotspots?.map(h => ({ id: h.id, name: h.name })),
+      previouslyInteractedHotspotIds: previouslyInteractedHotspotIds,
       isResonanceSurgeAvailable: gameState.isResonanceSurgeAvailable,
       resonanceSurgeCooldownTurnsLeft: gameState.resonanceSurgeCooldown,
       language: gameState.currentLanguage,
@@ -707,7 +765,7 @@ const App: React.FC = () => {
     gameState.whisperingEchoes, gameState.playerEchoicSignature, gameState.factionReputationNotes,
     gameState.renown, gameState.currentTimeOfDay, gameState.currentWeather, gameState.playerInventory,
     gameState.currentRumors, gameState.activeDissonanceEffect, gameState.playerConditions,
-    gameState.isResonanceSurgeAvailable, gameState.resonanceSurgeCooldown, gameState.currentLanguage
+    gameState.activeEchoHotspots, gameState.isResonanceSurgeAvailable, gameState.resonanceSurgeCooldown, gameState.currentLanguage
   ]);
 
   const fetchGameData: FetchGameDataFn = useCallback(async (
@@ -716,8 +774,8 @@ const App: React.FC = () => {
     isFinalProfileSubmission: boolean = false,
     isSurgeEffect: boolean = false
   ) => {
-    if (!isSurgeEffect) dispatch({ type: 'SET_LOADING', payload: true }); 
-    else dispatch({ type: 'RESONANCE_SURGE_INITIATED' }); 
+    if (!isSurgeEffect) dispatch({ type: 'SET_LOADING', payload: true });
+    else dispatch({ type: 'RESONANCE_SURGE_INITIATED' });
 
     dispatch({ type: 'SET_ERROR', payload: null });
     dispatch({ type: 'SET_LAST_CHOSEN_INDEX', payload: null });
@@ -736,7 +794,7 @@ const App: React.FC = () => {
       if (isSurgeEffect) soundService.playSound('SURGE_EFFECT_APPLIED');
 
 
-      const newImagePromptFromAI = responseData.imagePrompt; 
+      const newImagePromptFromAI = responseData.imagePrompt;
 
       if (isProfileSetupStage) {
         dispatch({
@@ -744,7 +802,7 @@ const App: React.FC = () => {
           payload: {
             scene: responseData.scene,
             choices: responseData.choices,
-            imagePrompt: newImagePromptFromAI || null, 
+            imagePrompt: newImagePromptFromAI || null,
           }
         });
         if (newImagePromptFromAI) fetchImage(newImagePromptFromAI);
@@ -767,26 +825,25 @@ const App: React.FC = () => {
         setCurrentPhase(GamePhase.Playing);
         return;
       }
-      
+
       dispatch({ type: 'PROCESS_AI_RESPONSE', payload: {responseData, isSurgeEffect} });
 
-
-      if (newImagePromptFromAI !== undefined) { 
+      if (newImagePromptFromAI !== undefined) {
          if (newImagePromptFromAI) {
             fetchImage(newImagePromptFromAI);
-         } else { 
-            // If AI explicitly sends null for imagePrompt, use placeholder.
-            // This case might be useful if AI wants to clear the image.
-            dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: null } });
+         } else {
+            // Only set placeholder if no image prompt was given AND there's no current image from previous turn.
+            // This prevents replacing a good image with a placeholder on minor turns.
+            if (!gameState.currentImageUrl) {
+              dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: null } });
+            }
          }
-      } else { 
-        // If imagePrompt is undefined in responseData, it means AI didn't specify an image update.
-        // In this case, we only load a placeholder if there's no current image at all during active play.
+      } else {
+        // If imagePrompt is undefined (meaning AI wants to keep current image), but we have no current image, set placeholder.
         if (!gameState.currentImageUrl && currentPhase === GamePhase.Playing) {
-             dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: gameState.currentImagePrompt } }); 
+             dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: gameState.currentImagePrompt } });
         }
       }
-
 
       if (responseData.renownChangeAmount && responseData.renownChangeAmount !== 0) soundService.playSound('RENOWN_CHANGED');
       if (responseData.newLore && responseData.newLore.length > 0) soundService.playSound('LORE_UNLOCKED');
@@ -814,10 +871,43 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    if (currentPhase === GamePhase.HomeScreen && !gameState.apiKeyMissing && !gameState.homeScreenImageFetchAttempted && !gameState.homeScreenImageUrl && !gameState.isHomeScreenImageLoading) {
-      fetchHomeScreenImage();
+    // This effect manages the initial phase setting based on API key and intro status.
+    if (gameState.apiKeyMissing) {
+      if (currentPhase !== GamePhase.Error) {
+          setShowIntroVideo(false); // Don't show intro if API key is missing
+          setCurrentPhase(GamePhase.Error);
+          if (!gameState.error) {
+            dispatch({ type: 'SET_ERROR', payload: t(API_KEY_ERROR_MESSAGE_KEY) });
+          }
+      }
+    } else if (showIntroVideo) {
+      // If API key is present and intro should be shown, currentPhase remains (or becomes) HomeScreen
+      // The IntroVideoPlayer will be rendered.
+      // Set currentPhase to HomeScreen so the app structure prepares for it.
+      if (currentPhase !== GamePhase.HomeScreen && currentPhase !== GamePhase.Error) {
+          setCurrentPhase(GamePhase.HomeScreen);
+      }
+    } else {
+      // API key is fine, intro is done/skipped.
+      // Ensure we are in HomeScreen phase if not already in an active game phase.
+      if (currentPhase === GamePhase.HomeScreen && !gameState.homeScreenImageFetchAttempted && !gameState.homeScreenImageUrl && !gameState.isHomeScreenImageLoading) {
+        fetchHomeScreenImage();
+      } else if (currentPhase !== GamePhase.Playing && currentPhase !== GamePhase.ArchetypeSelection && currentPhase !== GamePhase.OriginSelection && currentPhase !== GamePhase.BackgroundSelection && currentPhase !== GamePhase.NameInput && currentPhase !== GamePhase.ConfirmationAndTransition && currentPhase !== GamePhase.AwaitingNameInput && currentPhase !== GamePhase.AwaitingLoreInterpretation && currentPhase !== GamePhase.Error) {
+        // If not in any specific game phase and intro is done, default to HomeScreen
+        setCurrentPhase(GamePhase.HomeScreen);
+      }
     }
-  }, [currentPhase, gameState.apiKeyMissing, gameState.homeScreenImageFetchAttempted, gameState.homeScreenImageUrl, gameState.isHomeScreenImageLoading, fetchHomeScreenImage]);
+  }, [gameState.apiKeyMissing, showIntroVideo, currentPhase, gameState.error, t, fetchHomeScreenImage, gameState.homeScreenImageFetchAttempted, gameState.homeScreenImageUrl, gameState.isHomeScreenImageLoading]);
+
+  const handleIntroFinished = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hasPlayedIntro', 'true');
+    }
+    setShowIntroVideo(false);
+    // After intro finishes, we should be going to the HomeScreen.
+    // The useEffect above will handle fetching home screen image once currentPhase is HomeScreen.
+    setCurrentPhase(GamePhase.HomeScreen);
+  };
 
   const startGameFlow = useCallback(() => {
     if (gameState.apiKeyMissing) {
@@ -826,16 +916,16 @@ const App: React.FC = () => {
       return;
     }
     soundService.playSound('GAME_START');
-    dispatch({ 
-        type: 'INITIALIZE_GAME_STATE', 
-        payload: { 
+    dispatch({
+        type: 'INITIALIZE_GAME_STATE',
+        payload: {
             currentLanguage: gameState.currentLanguage,
-            currentImagePrompt: null, 
+            currentImagePrompt: null,
             currentImageUrl: null,
-            characterProfile: null, 
+            characterProfile: null,
             gameStarted: false,
-        } 
-    }); 
+        }
+    });
     setCurrentPhase(GamePhase.ArchetypeSelection);
     fetchGameData(CHARACTER_CREATION_INTRO_PROMPT, true);
   }, [fetchGameData, gameState.apiKeyMissing, gameState.currentLanguage, t]);
@@ -845,13 +935,27 @@ const App: React.FC = () => {
     dispatch({ type: 'SET_LAST_CHOSEN_INDEX', payload: index });
     dispatch({ type: 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY' });
 
+    let historyEntryType: HistoryEntry['type'] = 'choice';
+    // Check if the choice is a hotspot interaction based on its format (e.g., "hotspotId:Choice Text")
+    // This is a convention that the AI needs to follow if it wants a choice to be recorded as a hotspot interaction.
+    const hotspotChoiceMatch = choiceIdOrText.match(/^([a-zA-Z0-9_]+):(.*)$/);
+    let actualChoiceText = choiceIdOrText;
+    let hotspotIdInteracted: string | undefined = undefined;
+
+    if (hotspotChoiceMatch) {
+        hotspotIdInteracted = hotspotChoiceMatch[1];
+        actualChoiceText = hotspotChoiceMatch[2].trim();
+        historyEntryType = 'hotspot_interaction';
+    }
+
+
     const addCreationHistory = (stage: string, selection: string) => {
       const entry: HistoryEntry = { id: `hist_creation_${stage}_${Date.now()}`, sceneSummary: `Character Creation - ${stage}: ${selection}`, choiceMade: selection, timestamp: new Date().toISOString(), fullSceneText: `Player selected '${selection}' for ${stage}.`, type: 'character_creation' };
       dispatch({ type: 'ADD_HISTORY_ENTRY', payload: entry });
     };
 
     if (currentPhase === GamePhase.ArchetypeSelection) {
-      const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === choiceIdOrText);
+      const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === actualChoiceText); // Use actualChoiceText
       if (chosenArchetype) {
         addCreationHistory("Archetype", chosenArchetype.title);
         dispatch({ type: 'UPDATE_CHARACTER_CREATION_STEP', payload: { scene: '', choices: [], imagePrompt: null, data: { selectedArchetypeId: chosenArchetype.id } } });
@@ -859,7 +963,7 @@ const App: React.FC = () => {
         fetchGameData(ARCHETYPE_SELECTED_PROMPT_TEMPLATE(chosenArchetype), true);
       }
     } else if (currentPhase === GamePhase.OriginSelection) {
-      const chosenOrigin = ORIGINS_DATA.find(o => o.id === choiceIdOrText);
+      const chosenOrigin = ORIGINS_DATA.find(o => o.id === actualChoiceText); // Use actualChoiceText
       const currentArchetype = ARCHETYPES_DATA.find(a => a.id === gameState.selectedArchetypeId);
       if (chosenOrigin && currentArchetype) {
         addCreationHistory("Origin", chosenOrigin.name);
@@ -868,7 +972,7 @@ const App: React.FC = () => {
         fetchGameData(ORIGIN_SELECTED_PROMPT_TEMPLATE(currentArchetype, chosenOrigin), true);
       }
     } else if (currentPhase === GamePhase.BackgroundSelection) {
-      const chosenBackground = BACKGROUNDS_DATA.find(b => b.id === choiceIdOrText);
+      const chosenBackground = BACKGROUNDS_DATA.find(b => b.id === actualChoiceText); // Use actualChoiceText
       const currentArchetype = ARCHETYPES_DATA.find(a => a.id === gameState.selectedArchetypeId);
       const currentOrigin = ORIGINS_DATA.find(o => o.id === gameState.selectedOriginId);
       if (chosenBackground && currentArchetype && currentOrigin) {
@@ -882,28 +986,28 @@ const App: React.FC = () => {
       const newHistoryEntry: HistoryEntry = {
         id: `hist_${Date.now()}`,
         sceneSummary: currentSceneText.substring(0, 150),
-        choiceMade: choiceIdOrText,
+        choiceMade: choiceIdOrText, // Use original choiceIdOrText for history (includes hotspotId if present)
         timestamp: new Date().toISOString(),
         fullSceneText: currentSceneText,
-        type: 'choice'
+        type: historyEntryType
       };
       dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
 
       const baseAIContext = buildGameContextForAI();
       const finalContextForAI: GameContextForAI = {
         ...baseAIContext,
-        lastPlayerChoice: choiceIdOrText,
+        lastPlayerChoice: actualChoiceText, // Send the AI only the actual choice text
         recentHistorySummary: [...gameState.historyLog, newHistoryEntry].slice(-3).map(h => `${h.sceneSummary.substring(0, 50)}... -> ${h.choiceMade || h.type}`).join(' | ')
       };
 
       let promptToSend: string;
-      if (choiceIdOrText.startsWith("Attempt to Synthesize Echoes")) {
+      if (actualChoiceText.startsWith("Attempt to Synthesize Echoes")) { // Use actualChoiceText
         promptToSend = SYNTHESIZE_ECHOES_PROMPT_TEMPLATE(finalContextForAI);
-      } else if (choiceIdOrText.startsWith("Attempt to Synthesize Lore Fragments:")) {
-        const fragmentTitles = choiceIdOrText.replace("Attempt to Synthesize Lore Fragments: ", "").split(" & ");
+      } else if (actualChoiceText.startsWith("Attempt to Synthesize Lore Fragments:")) { // Use actualChoiceText
+        const fragmentTitles = actualChoiceText.replace("Attempt to Synthesize Lore Fragments: ", "").split(" & ");
         promptToSend = SYNTHESIZE_LORE_FRAGMENTS_PROMPT_TEMPLATE(finalContextForAI, fragmentTitles);
-      } else if (choiceIdOrText.startsWith("Attempt to Attune to ")) {
-        const itemName = choiceIdOrText.replace("Attempt to Attune to ", "");
+      } else if (actualChoiceText.startsWith("Attempt to Attune to ")) { // Use actualChoiceText
+        const itemName = actualChoiceText.replace("Attempt to Attune to ", "");
         promptToSend = ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE(finalContextForAI, itemName);
       } else {
         promptToSend = CONTINUE_GAME_PROMPT_TEMPLATE(finalContextForAI);
@@ -948,7 +1052,7 @@ const App: React.FC = () => {
         choiceMade: "Synthesize Echoes",
         timestamp: new Date().toISOString(),
         fullSceneText: "Player chose to synthesize the currently perceived whispering echoes.",
-        type: 'lore_synthesis' 
+        type: 'lore_synthesis'
       };
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
     fetchGameData(SYNTHESIZE_ECHOES_PROMPT_TEMPLATE(context));
@@ -971,7 +1075,7 @@ const App: React.FC = () => {
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
     fetchGameData(FOCUS_SENSES_PROMPT_TEMPLATE(context));
   }, [gameState.isLoading, isReflecting, fetchGameData, buildGameContextForAI]);
-  
+
   const handleResonanceSurge = useCallback(() => {
     if (!gameState.isResonanceSurgeAvailable || gameState.isLoading || isReflecting) return;
     soundService.playSound('RESONANCE_SURGE_ACTIVATE');
@@ -1075,7 +1179,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Error requesting reflection:", error);
-      dispatch({ type: 'SET_ERROR', payload: "The weave of thoughts became tangled. Reflection unclear." }); // Could be translated
+      dispatch({ type: 'SET_ERROR', payload: "The weave of thoughts became tangled. Reflection unclear." });
     } finally {
       setIsReflecting(false);
     }
@@ -1084,7 +1188,7 @@ const App: React.FC = () => {
   const dismissError = () => {
     dispatch({ type: 'SET_ERROR', payload: null });
     if (gameState.apiKeyMissing) {
-      setCurrentPhase(GamePhase.HomeScreen);
+      setCurrentPhase(GamePhase.HomeScreen); // Stay on HomeScreen if API key is missing, intro won't play
     } else if (!gameState.gameStarted) {
       setCurrentPhase(GamePhase.HomeScreen);
     } else {
@@ -1092,16 +1196,13 @@ const App: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (gameState.apiKeyMissing && currentPhase !== GamePhase.Error) {
-      dispatch({ type: 'SET_ERROR', payload: t(API_KEY_ERROR_MESSAGE_KEY) });
-      setCurrentPhase(GamePhase.Error);
-    }
-  }, [gameState.apiKeyMissing, currentPhase, t]);
-  
   const handleLanguageChangeAndReset = useCallback((lang: 'en' | 'pt') => {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
-    setCurrentPhase(GamePhase.HomeScreen); 
+    setShowIntroVideo(true); // Reset to show intro on language change
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('hasPlayedIntro'); // Clear intro played status
+    }
+    setCurrentPhase(GamePhase.HomeScreen);
   }, []);
 
 
@@ -1115,7 +1216,11 @@ const App: React.FC = () => {
   const handleTogglePlayerNotes = () => dispatch({ type: 'TOGGLE_PLAYER_NOTES_MODAL' });
 
 
-  const appContainerClasses = `min-h-screen flex flex-col transition-all duration-300 ease-in-out ${currentPhase !== GamePhase.HomeScreen && currentPhase !== GamePhase.ArchetypeSelection && currentPhase !== GamePhase.OriginSelection && currentPhase !== GamePhase.BackgroundSelection && currentPhase !== GamePhase.NameInput && currentPhase !== GamePhase.ConfirmationAndTransition ? 'fantasy-parchment' : ''} ${currentPhase === GamePhase.Playing ? 'subtle-breathing-panel' : ''}`;
+  const appContainerClasses = `min-h-screen flex flex-col transition-all duration-300 ease-in-out ${currentPhase !== GamePhase.HomeScreen && currentPhase !== GamePhase.ArchetypeSelection && currentPhase !== GamePhase.OriginSelection && currentPhase !== GamePhase.BackgroundSelection && currentPhase !== GamePhase.NameInput && currentPhase !== GamePhase.ConfirmationAndTransition && !showIntroVideo ? 'fantasy-parchment' : ''} ${currentPhase === GamePhase.Playing ? 'subtle-breathing-panel' : ''}`;
+
+  if (showIntroVideo && !gameState.apiKeyMissing) {
+    return <IntroVideoPlayer src="/assets/intro.mp4" onVideoEnd={handleIntroFinished} t={t} />;
+  }
 
   const mainContent = () => {
     switch (currentPhase) {
@@ -1136,7 +1241,6 @@ const App: React.FC = () => {
           }
           return [];
         };
-        // AI will provide translated titles/descriptions. Client side UI around it.
         return (
           <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto w-full flex-grow flex flex-col justify-center animate-fadeIn">
             <ImageDisplay imageUrl={gameState.currentImageUrl} altText={gameState.currentImagePrompt || "Character creation choice"} isLoading={gameState.isLoading && !gameState.currentImageUrl && !!gameState.currentImagePrompt} t={t} />
@@ -1175,18 +1279,23 @@ const App: React.FC = () => {
           </div>
         </div>;
       case GamePhase.Playing:
-        if (gameState.isLoading && !gameState.currentScene && gameState.gameStarted) return <LoadingIndicator isLoading={true} message={t("The Weave shifts...")} />;
+        if (gameState.isLoading && !gameState.currentScene && gameState.gameStarted) return <LoadingIndicator isLoading={true} message={t("The Weave shifts...")} t={t} />;
         return (<StoryDisplayContainer t={t} gameState={gameState} handlePlayerChoice={handlePlayerChoice} handleSynthesizeEchoes={handleSynthesizeEchoes} handleFocusSenses={handleFocusSenses} handleResonanceSurge={handleResonanceSurge} handleRequestReflection={handleRequestReflection} isReflecting={isReflecting} handleTogglePlayerNotes={handleTogglePlayerNotes} />);
       case GamePhase.Error:
         return <ErrorDisplay t={t} error={gameState.error || t(GENERIC_API_ERROR_MESSAGE_KEY)} onDismiss={dismissError} startGameFlow={startGameFlow} currentLanguage={gameState.currentLanguage} />;
       case GamePhase.AwaitingNameInput:
-        if (gameState.isLoading && !gameState.insightToName) return <LoadingIndicator isLoading={true} message={t("Solidifying understanding...")} />;
+        if (gameState.isLoading && !gameState.insightToName) return <LoadingIndicator isLoading={true} message={t("Solidifying understanding...")} t={t} />;
         return <NameInsightForm t={t} onSubmit={handleNameInsightSubmit} onCancel={handleCancelNaming} insightText={gameState.insightToName || "A significant understanding..."} isLoading={gameState.isLoading} />;
       case GamePhase.AwaitingLoreInterpretation:
-        if (!gameState.loreToInterpret) return <LoadingIndicator isLoading={true} message={t("Delving into arcane interpretations...")} />;
+        if (!gameState.loreToInterpret) return <LoadingIndicator isLoading={true} message={t("Delving into arcane interpretations...")} t={t} />;
         return <LoreInterpretationModal t={t} loreTitle={gameState.loreToInterpret.title} interpretations={gameState.loreToInterpret.interpretations} onSubmit={handleLoreInterpretationSubmit} onCancel={handleCancelLoreInterpretation} />;
       default:
-        return <LoadingIndicator isLoading={true} message={t("Awakening the echoes...")} />;
+        // This case should ideally not be reached if API key is missing and intro is handled.
+        // If it is, it's likely API key is missing, or intro video is somehow stuck.
+        if (gameState.apiKeyMissing) {
+             return <ErrorDisplay t={t} error={t(API_KEY_ERROR_MESSAGE_KEY)} onDismiss={dismissError} startGameFlow={startGameFlow} currentLanguage={gameState.currentLanguage} />;
+        }
+        return <LoadingIndicator isLoading={true} message={t("Awakening the echoes...")} t={t} />;
     }
   };
 
@@ -1208,16 +1317,16 @@ const App: React.FC = () => {
     );
   };
 
-  const StoryDisplayContainer: React.FC<{ 
-    t: (key: string, params?: Record<string, string | number>) => string, 
-    gameState: GameState, 
-    handlePlayerChoice: (choice: string, index: number) => void, 
-    handleSynthesizeEchoes: () => void, 
-    handleFocusSenses: () => void, 
-    handleResonanceSurge: () => void, 
-    handleRequestReflection: () => void, 
-    isReflecting: boolean, 
-    handleTogglePlayerNotes: () => void 
+  const StoryDisplayContainer: React.FC<{
+    t: (key: string, params?: Record<string, string | number>) => string,
+    gameState: GameState,
+    handlePlayerChoice: (choice: string, index: number) => void,
+    handleSynthesizeEchoes: () => void,
+    handleFocusSenses: () => void,
+    handleResonanceSurge: () => void,
+    handleRequestReflection: () => void,
+    isReflecting: boolean,
+    handleTogglePlayerNotes: () => void
   }> = ({ t, gameState, handlePlayerChoice, handleSynthesizeEchoes, handleFocusSenses, handleResonanceSurge, handleRequestReflection, isReflecting, handleTogglePlayerNotes }) => (
     <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
       <header className="text-center mb-6 md:mb-10">
@@ -1235,13 +1344,13 @@ const App: React.FC = () => {
       <div className="bg-secondary p-4 sm:p-6 rounded-lg shadow-lg border border-divider-color mb-6">
         <h2 className="font-heading text-3xl text-heading-color mb-4 border-b border-divider-color pb-2">{t("The Unfolding Path")}</h2>
         <StoryDisplay storyText={gameState.currentScene} enableTypingEffect={true} className="text-lg text-main-color" />
-        <ChoicesDisplay choices={gameState.choices} onChoiceSelected={handlePlayerChoice} isLoading={gameState.isLoading || isReflecting} lastChosenIndex={gameState.lastChosenChoiceIndex} />
+        <ChoicesDisplay choices={gameState.choices} onChoiceSelected={handlePlayerChoice} isLoading={gameState.isLoading || isReflecting} lastChosenIndex={gameState.lastChosenChoiceIndex} activeHotspots={gameState.activeEchoHotspots} />
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
           <button onClick={handleSynthesizeEchoes} className={`fantasy-button fantasy-button-secondary ${(gameState.whisperingEchoes.length > 0 && !gameState.isLoading && !isReflecting) ? 'synthesis-button-ready-pulse' : ''}`} disabled={gameState.isLoading || isReflecting || gameState.whisperingEchoes.length === 0}> {t("Synthesize ({count})", { count: gameState.whisperingEchoes.length })} </button>
           <button onClick={handleFocusSenses} className="fantasy-button fantasy-button-secondary" disabled={gameState.isLoading || isReflecting || !gameState.currentScene}>{t("Focus Senses")}</button>
-          <button 
-            onClick={handleResonanceSurge} 
-            className={`fantasy-button fantasy-button-primary ${gameState.isResonanceSurgeAvailable ? 'resonance-surge-ready-pulse' : ''}`} 
+          <button
+            onClick={handleResonanceSurge}
+            className={`fantasy-button fantasy-button-primary ${gameState.isResonanceSurgeAvailable ? 'resonance-surge-ready-pulse' : ''}`}
             disabled={!gameState.isResonanceSurgeAvailable || gameState.isLoading || isReflecting}
           >
             {gameState.isResonanceSurgeAvailable ? t("Resonance Surge") : t("Surge (CD: {cooldown})", { cooldown: gameState.resonanceSurgeCooldown })}
@@ -1272,11 +1381,11 @@ const App: React.FC = () => {
       <LoadingIndicator
         isLoading={
           (gameState.isLoading && (currentPhase !== GamePhase.Playing || (currentPhase === GamePhase.Playing && !gameState.currentImageUrl && !!gameState.currentImagePrompt))) ||
-          (currentPhase === GamePhase.HomeScreen && gameState.isHomeScreenImageLoading && !gameState.homeScreenImageUrl)
+          (currentPhase === GamePhase.HomeScreen && !showIntroVideo && gameState.isHomeScreenImageLoading && !gameState.homeScreenImageUrl)
         }
         message={
           gameState.apiKeyMissing ? t("Awaiting Weaver's Permission (API Key)...") :
-            currentPhase === GamePhase.HomeScreen && gameState.isHomeScreenImageLoading ? t("The Atheneum Materializes...") :
+            (currentPhase === GamePhase.HomeScreen && !showIntroVideo && gameState.isHomeScreenImageLoading) ? t("The Atheneum Materializes...") :
               (currentPhase !== GamePhase.Playing && gameState.isLoading) ? t("The Threads of Fate are Weaving...") :
                 (currentPhase === GamePhase.Playing && gameState.isLoading && !gameState.currentImageUrl && !!gameState.currentImagePrompt) ? t("A Vision Coalesces...") :
                   t("The Weave Shimmers...")
@@ -1284,17 +1393,17 @@ const App: React.FC = () => {
         t={t}
       />
       {mainContent()}
-      <SettingsPanel 
+      <SettingsPanel
         t={t}
-        isOpen={gameState.showSettingsPanel} 
-        onClose={handleCloseSettings} 
-        currentTheme={currentTheme} 
-        onToggleTheme={toggleTheme} 
-        volume={gameState.currentVolume} 
-        onVolumeChange={handleVolumeChange} 
-        isMuted={gameState.isMuted} 
-        onMuteToggle={handleMuteToggle} 
-        isColorBlindAssistActive={gameState.isColorBlindAssistActive} 
+        isOpen={gameState.showSettingsPanel}
+        onClose={handleCloseSettings}
+        currentTheme={currentTheme}
+        onToggleTheme={toggleTheme}
+        volume={gameState.currentVolume}
+        onVolumeChange={handleVolumeChange}
+        isMuted={gameState.isMuted}
+        onMuteToggle={handleMuteToggle}
+        isColorBlindAssistActive={gameState.isColorBlindAssistActive}
         onToggleColorBlindAssist={toggleColorBlindAssist}
         currentLanguage={gameState.currentLanguage}
         onLanguageChangeAndReset={handleLanguageChangeAndReset}
@@ -1312,8 +1421,8 @@ const App: React.FC = () => {
           onDeleteNote={(id) => dispatch({ type: 'DELETE_PLAYER_NOTE', payload: { id } })}
         />
       )}
-      <footer className={`text-center py-5 border-t text-xs ${currentPhase === GamePhase.HomeScreen ? 'absolute bottom-0 w-full bg-black bg-opacity-30 text-gray-400 border-transparent' : 'mt-auto border-divider-color text-muted-color'}`}>
-        <p> {t(currentPhase === GamePhase.HomeScreen ? "A tale woven by Gemini & React." : "Resonant Echoes. Created with Gemini & React.")} </p>
+      <footer className={`text-center py-5 border-t text-xs ${currentPhase === GamePhase.HomeScreen && !showIntroVideo ? 'absolute bottom-0 w-full bg-black bg-opacity-30 text-gray-400 border-transparent' : 'mt-auto border-divider-color text-muted-color'}`}>
+        <p> {t(currentPhase === GamePhase.HomeScreen && !showIntroVideo ? "A tale woven by Gemini & React." : "Resonant Echoes. Created with Gemini & React.")} </p>
         <p> {t("Fonts: MedievalSharp & EB Garamond by Google Fonts.")} </p>
       </footer>
     </div>
