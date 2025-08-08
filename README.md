@@ -1,4 +1,3 @@
-
 # 📜✨ RESONANT ECHOES ✨📜
 ### _A Chronicle Woven from Light, Choice, and the Fading Song_
 
@@ -39,7 +38,7 @@ You, Resonator, are a **Confluence Point**, an individual whose spirit resonates
 
 The manifestation of Resonant Echoes upon your scrying device is achieved through a confluence of sophisticated enchantments from the world beyond Aerthos:
 
-*   **The Oracle's Mind (AI Narrative & Logic)**: The tale is dynamically woven by the **Google Gemini API** (specifically, the `gemini-2.5-flash-preview-04-17` incantation). Its responses are shaped by the sacred `CORE_SYSTEM_INSTRUCTION` and a grimoire of prompt templates located within the `constants.ts` scroll.
+*   **The Oracle's Mind (AI Narrative & Logic)**: The tale is dynamically woven by the **Google Gemini API** (specifically, the `gemini-2.5-flash` incantation). Its responses are shaped by the sacred `CORE_SYSTEM_INSTRUCTION` and a grimoire of prompt templates located within the `constants.ts` scroll.
 *   **The Seer's Eye (AI-Generated Imagery)**: The evocative visions and spectral landscapes are conjured forth by **Google Imagen 3** (specifically, the `imagen-3.0-generate-002` variant), a potent iteration of Google's image generation alchemy, breathing visual life into the narrative's most poignant moments.
 *   **The Artisan's Craft (Frontend Framework)**: The interactive tapestry is rendered through **React** and inscribed with **TypeScript**, ensuring a responsive and resilient experience.
 *   **The Cartographer's Tools (Styling)**: The visual aesthetic is achieved with **Tailwind CSS** (invoked via CDN for swift incantation) and bespoke CSS spells enshrined within `index.html`.

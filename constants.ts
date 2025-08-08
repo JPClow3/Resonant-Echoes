@@ -2,7 +2,7 @@
 
 import { GameContextForAI, ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile } from './types';
 
-export const GEMINI_NARRATIVE_MODEL = 'gemini-2.5-flash-preview-04-17';
+export const GEMINI_NARRATIVE_MODEL = 'gemini-2.5-flash';
 export const IMAGEN_IMAGE_MODEL = 'imagen-3.0-generate-002';
 
 export const PLACEHOLDER_IMAGE_URL = 'https://picsum.photos/seed/fantasyquest/800/600';
