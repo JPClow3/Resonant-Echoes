@@ -1,4 +1,5 @@
 
+
 export interface WhisperingEchoDetail {
   id: string;
   text: string;
@@ -57,7 +58,7 @@ export interface HistoryEntry {
   choiceMade?: string;
   timestamp: string;
   fullSceneText: string;
-  type: 'story' | 'choice' | 'named_insight' | 'reflection' | 'lore_synthesis' | 'artifact_attunement' | 'echo_weaving_cost' | 'dissonance_encounter' | 'character_creation' | 'focused_perception' | 'resonance_surge' | 'hotspot_interaction';
+  type: 'story' | 'choice' | 'named_insight' | 'reflection' | 'lore_synthesis' | 'artifact_attunement' | 'echo_weaving_cost' | 'dissonance_encounter' | 'character_creation' | 'focused_perception' | 'resonance_surge' | 'hotspot_interaction' | 'location_discovery' | 'custom_action';
 }
 
 export interface FactionUpdate {
@@ -173,6 +174,14 @@ export interface EchoHotspot {
   interactionPrompt?: string; // Suggested text for a choice, e.g., "Examine the glowing carving"
 }
 
+export interface LocationData {
+    id: string;
+    name: string;
+    description: string;
+    x: number; // 0-100 coordinate
+    y: number; // 0-100 coordinate
+}
+
 export interface GeminiResponseData {
   scene: string;
   choices: string[];
@@ -217,10 +226,13 @@ export interface GeminiResponseData {
   devouringSilenceZoneInScene?: DevouringSilenceZone;
   observedFloraFauna?: ResonanceFloraFauna[];
   architecturalDetails?: ArchitecturalEchoDetail;
-  activeEchoHotspots?: EchoHotspot[]; // New for Echo Hotspots
+  activeEchoHotspots?: EchoHotspot[];
 
   // Resonance Surge
   suggestedResonanceSurgeCooldown?: number;
+
+  // Map
+  newLocationDiscovered?: LocationData;
 }
 
 export interface GameState {
@@ -254,9 +266,7 @@ export interface GameState {
   isHomeScreenImageLoading?: boolean;
   homeScreenImageFetchAttempted: boolean; 
   showSettingsPanel: boolean;
-  showLoreJournalModal: boolean;
   newestLoreEntryId: string | null;
-  showHistoryLogModal: boolean;
   currentVolume: number; 
   isMuted: boolean;
   isColorBlindAssistActive: boolean;
@@ -275,7 +285,7 @@ export interface GameState {
   echoicBlightInScene?: EchoicBlight | null;
   activeMemoryPhantoms: MemoryPhantom[];
   devouringSilenceZoneInScene?: DevouringSilenceZone | null;
-  activeEchoHotspots?: EchoHotspot[]; // New for Echo Hotspots
+  activeEchoHotspots?: EchoHotspot[];
 
   // Player Notes
   playerNotes: PlayerNote[];
@@ -287,6 +297,16 @@ export interface GameState {
 
   // Language
   currentLanguage: 'en' | 'pt';
+
+  // Modals & UI states
+  showLoreJournalModal: boolean;
+  showHistoryLogModal: boolean;
+  showMapModal: boolean;
+  showEchoWeavingModal: boolean;
+
+  // Map Data
+  discoveredLocations: LocationData[];
+  currentLocationId: string | null;
 }
 
 export interface GameContextForAI {
@@ -343,8 +363,12 @@ export interface GameContextForAI {
   currentPlayerConditions?: string[]; // Array of condition descriptions
   activeEchoHotspotsSummary?: { id: string, name: string }[]; // Summary of currently known hotspots
   previouslyInteractedHotspotIds?: string[]; // IDs of hotspots already interacted with
-  isResonanceSurgeAvailable?: boolean; // Let AI know if it's usable
+  isResonanceSurgeAvailable?: boolean;
   resonanceSurgeCooldownTurnsLeft?: number;
+  
+  // Map Data
+  discoveredLocationsSummary?: { name: string }[];
+  currentLocationName?: string;
 
   // Language
   language: 'en' | 'pt';
@@ -363,4 +387,5 @@ export enum GamePhase {
   Error,
   AwaitingNameInput, // This is for in-game insights, not character name
   AwaitingLoreInterpretation,
+  AwaitingCustomActionInput, // For Resonance Surge
 }

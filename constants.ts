@@ -1,4 +1,5 @@
 
+
 import { GameContextForAI, ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile } from './types';
 
 export const GEMINI_NARRATIVE_MODEL = 'gemini-2.5-flash-preview-04-17';
@@ -246,7 +247,8 @@ export const NAME_SUBMITTED_PROMPT_TEMPLATE = (profile: CharacterProfile): strin
     "currentTimeOfDay": "Early Morning",
     "currentWeather": "Serene, but with a subtle undercurrent of unease in the Aetheric currents",
     "soundscape": "Gentle hum of the shrine, distant wind chimes, Theron's calm voice, a sense of quiet anticipation. Occasionally, a barely perceptible thrumming from the shrine's stones.",
-    "confirmedProfileSummary": "You are ${profile.firstName}, the ${profile.archetype.title}, hailing from ${profile.origin.name}, with a background as a ${profile.background.title}. Your journey of awareness begins..."
+    "confirmedProfileSummary": "You are ${profile.firstName}, the ${profile.archetype.title}, hailing from ${profile.origin.name}, with a background as a ${profile.background.title}. Your journey of awareness begins...",
+    "newLocationDiscovered": { "id": "loc_aethelgard_shrine", "name": "Aethelgard Shrine", "description": "An ancient, quiet shrine within the Aethelgardian Sky-Court, where you began your journey.", "x": 50, "y": 50 }
   }
 `;
 
@@ -271,7 +273,7 @@ The player's journey involves understanding their abilities, the nature of Echoe
     *   Set the \`initialPlayerEchoicSignature\` based on their background benefit's 'signatureEffect' (or a default if none).
     *   Grant any starting lore or items from their background benefit (referencing startingLoreId or startingItemId), or default simple items.
     *   Craft the *actual first game scene* at the shrine, tailored to their profile, focusing on a gentle introduction to their nascent sensitivities as per the template.
-    *   This response MUST include an \`imagePrompt\` and transitions the game to the main playing loop.
+    *   This response MUST include an \`imagePrompt\` and transitions the game to the main playing loop. It MUST also include the initial \`newLocationDiscovered\` data for the starting shrine.
 
 **Gentle Introduction (First Scene Post-Character Creation):** For the *very first scene after character creation (i.e., the response to \`NAME_SUBMITTED_PROMPT_TEMPLATE\`)*: Focus on a gentle introduction. Avoid immediate high stakes or complex magical phenomena. The player character has a unique, nascent 'sensitivity' or 'awareness' rather than fully formed 'Echo Weaving' abilities. The first task should be observational or introspective, allowing them to experience this basic sense in a safe context (e.g., describing what they 'feel' from a mundane object). 'Echoes' should be introduced as these faint, almost intuitive senses first, not complex magical constructs. The 'Unraveling Song' and 'Dissonance' should be hinted at subtly, perhaps as a background worry or a slight 'wrongness' in the world that Elder Theron is concerned about, not an immediate crisis for the player to solve. Initial items should be simple (e.g., a journal, basic notes). The goal is to ease the player into the world's unique aspects and their character's special perception.
 *   Include subtle environmental cues of the Unraveling's effects even in safe areas (e.g., a momentary flicker in light, a faint tremor, an unnatural chill, a sound briefly muted) to make the threat feel present and unsettling from the start.
@@ -297,7 +299,7 @@ The player's journey involves understanding their abilities, the nature of Echoe
     *   **Artifact Attunement:** Use \`ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE\`. Allows discovery of echoes within items. Success depends on player's Signature and context.
     *   **Costs/Limitations:** Narrate the costs of Echo Weaving (sensory dulling, headaches, signature instability, echo sickness, resonance burn) as defined in \`WhisperingEchoDetail.weavingCost\` or based on Dissonance. Incorporate Sanderson's Laws: Understandability (success tied to player knowledge), Limitations > Powers (costs and restrictions are key), Expand existing abilities before adding new ones.
 *   **Focus Senses Action:** When the player chooses to 'Focus Senses' (or a similar phrasing if presented as a choice), you will receive context and should use the \`FOCUS_SENSES_PROMPT_TEMPLATE\`'s logic. The goal is for the player to actively probe their environment for more subtle, ambient, or historical echoes that might not be immediately apparent. The response should primarily provide new \`whisperingEchoes\` and a descriptive \`scene\` text for the act of focusing. Optionally, a minor, temporary \`playerConditionUpdate\` (e.g., 'SensoryFocusFatigue') can be applied to represent the mental effort. Choices following this action should be contextual to any new information gained.
-*   **Resonance Surge Action:** When the player activates 'Resonance Surge' (if available, context.isResonanceSurgeAvailable will be true), you will receive context and should follow the \`RESONANCE_SURGE_PROMPT_TEMPLATE\`'s logic. This is a powerful, limited ability. The player expends it for a significant, context-dependent boon, such as: clarifying currently perceived echoes, temporarily mitigating a Dissonance effect, gaining a crucial lore insight (fragment or entry), or awakening a hidden echo within an item. The surge effect should be potent. After use, you MUST suggest a cooldown duration by providing \`suggestedResonanceSurgeCooldown\` (e.g., 3-7 turns) in your response.
+*   **Resonance Surge Action:** The player client handles the UI for this. When the player uses this ability and submits a custom action, you will receive the \`CUSTOM_ACTION_PROMPT_TEMPLATE\`. Follow its instructions to narrate the outcome.
 *   **Dissonance:** Introduce gradually.
     *   **Manifestations:** Introduce Echoic Blights (describe blightFlavor, sensoryImpact, effectOnWeaving), Memory Phantoms (describe phantomNature, echoicCoreText, appearance), Devouring Silence Zones (describe silenceIntensity, effectOnResonance, sensoryDeprivationDetails) gradually and contextually.
     *   **Flavors:** When Dissonance is present, specify its flavor (Volatile, Fragmented, Illusory, Consuming, Warping) and narrate its unique effects on the environment and Echo Weaving.
@@ -309,6 +311,7 @@ The player's journey involves understanding their abilities, the nature of Echoe
     *   Naming Insights: If \`offerToNameInsight: true\`, set \`expectsPlayerInputForName: true\` and provide \`namedInsightContext\`.
     *   Interpreting Lore: If \`interpretiveChoicesForLore\` is provided, set \`awaitingLoreInterpretation: true\`.
 *   **World Elements:**
+    *   **Map Data:** When the player enters a new, significant, named location for the first time, you MUST provide a \`newLocationDiscovered\` object in your response. This object should include a unique \`id\`, the \`name\` of the location, a brief \`description\`, and conceptual coordinates \`x\` and \`y\` (each a number between 0 and 100).
     *   **Flora/Fauna:** Incorporate Resonance Blooms, EchoMimicFauna, StoneSongLichen with their specific echoic properties.
     *   **Architecture:** Describe Architect ruins (alienGeometry, materialComposition, primordialResonance) and factional architecture (Aethelgardian Sky-Courts with observatories, Stoneheart Halls deep within mountains, Sylvan living structures).
 *   **Economic Integration:** Subtly reflect the value of echoes, lore, Heartstones, Resonance Lenses. Echo Weavers might offer services. Dissonant artifacts could have a black market.
@@ -374,6 +377,8 @@ Current Time of Day: ${context.currentTimeOfDay || "Unknown"}
 Current Weather: ${context.currentWeather || "Unknown"}
 Player Inventory: ${context.playerInventory && Object.keys(context.playerInventory).length > 0 ? Object.entries(context.playerInventory).map(([name, data]) => `${name} (x${data.count})${data.hasUndiscoveredEchoes ? ' [Echoes Untapped]' : ''}${data.isEchoicHeirloom ? ' [Heirloom]' : ''}`).join(', ') : "Empty"}
 Current Rumors: ${context.currentRumors && context.currentRumors.length > 0 ? context.currentRumors.join(' | ') : "None"}
+Discovered Locations: ${context.discoveredLocationsSummary && context.discoveredLocationsSummary.length > 0 ? context.discoveredLocationsSummary.map(l => l.name).join(', ') : 'None'}
+Current Location: ${context.currentLocationName || 'Unknown'}
 ${context.playerNamedInsight ? `Player just named an insight. Original context: "${context.playerNamedInsight.originalInsight}", Chosen name: "${context.playerNamedInsight.chosenName}". Acknowledge this appropriately.` : ''}
 ${context.playerInterpretedLore ? `Player just interpreted lore. Title: "${context.playerInterpretedLore.loreTitle}", Chosen interpretation: "${context.playerInterpretedLore.chosenInterpretation}". Weave this understanding into the narrative or character thoughts.` : ''}
 ${context.currentActiveDissonanceEffect ? `Active Dissonance Effect in Scene: "${context.currentActiveDissonanceEffect}"` : ""}
@@ -387,6 +392,7 @@ Target Language for Response: ${context.language}
 Based on the last player choice and the current game context, generate the next part of the story IN THE TARGET LANGUAGE (${context.language}).
 Provide "scene", "choices", and other relevant fields as per the GeminiResponseData interface, ensuring ALL TEXT is in the target language.
 The "imagePrompt" field is OPTIONAL. Only include it if there's a significant visual change or it's crucial for immersion.
+If the player enters a new significant location, provide it in "newLocationDiscovered".
 Ensure choices are distinct and lead to meaningful branches.
 If new echoes are perceived, include them in "whisperingEchoes".
 If new lore is discovered, include it in "newLore" or "loreFragments".
@@ -401,6 +407,7 @@ Player's Echoic Signature: "${context.playerEchoicSignature}"
 Current Scene Context/Recent History: ${context.recentHistorySummary || "The environment is currently being perceived."}
 Currently Perceived Whispering Echoes (before focusing): ${context.activeEchoesTexts && context.activeEchoesTexts.length > 0 ? context.activeEchoesTexts.map(e => `"${e.substring(0, 50)}..."`).join('; ') : "None"}
 Known Lore Titles: ${context.knownLoreTitles && context.knownLoreTitles.length > 0 ? context.knownLoreTitles.join(', ') : "None"}
+Current Location: ${context.currentLocationName || 'Unknown'}
 Current Time of Day: ${context.currentTimeOfDay || "Unknown"}
 Current Weather: ${context.currentWeather || "Unknown"}
 ${context.currentActiveDissonanceEffect ? `Active Dissonance Effect in Scene: "${context.currentActiveDissonanceEffect}"` : ""}
@@ -432,36 +439,29 @@ The "choices" provided after this action should be standard gameplay choices IN 
 Ensure the JSON response adheres to GeminiResponseData, with all player-facing text in ${context.language}.
 `;
 
-export const RESONANCE_SURGE_PROMPT_TEMPLATE = (context: GameContextForAI): string => `
+export const CUSTOM_ACTION_PROMPT_TEMPLATE = (context: GameContextForAI, customAction: string): string => `
 Player Profile: ${context.characterProfile ? `${context.characterProfile.firstName}, the ${context.characterProfile.archetypeTitle}` : "The Resonator"}
 Player's Echoic Signature: "${context.playerEchoicSignature}"
 Current Scene Context/Recent History: ${context.recentHistorySummary || "The environment is currently being perceived."}
-Active Whispering Echoes: ${context.activeEchoesTexts && context.activeEchoesTexts.length > 0 ? context.activeEchoesTexts.map(e => `"${e.substring(0, 50)}..."`).join('; ') : "None"}
-Known Lore Titles: ${context.knownLoreTitles && context.knownLoreTitles.length > 0 ? context.knownLoreTitles.join(', ') : "None"}
-Player Inventory: ${context.playerInventory && Object.keys(context.playerInventory).length > 0 ? Object.entries(context.playerInventory).map(([name, data]) => `${name} (x${data.count})${data.hasUndiscoveredEchoes ? ' [Untapped]' : ''}`).join(', ') : "Empty"}
-${context.currentActiveDissonanceEffect ? `Active Dissonance Effect: "${context.currentActiveDissonanceEffect}"` : ""}
-${context.currentPlayerConditions && context.currentPlayerConditions.length > 0 ? `Player Conditions: ${context.currentPlayerConditions.join(', ')} (Consider if 'ResonanceBurn' or similar conditions might narratively weaken the surge)` : ""}
+Current Location: ${context.currentLocationName || 'Unknown'}
 Target Language for Response: ${context.language}
 
-The player, ${context.characterProfile?.firstName || 'the Resonator'}, unleashes a "Resonance Surge". This is a powerful, focused burst of their inner resonant power.
-Describe this surge IN THE TARGET LANGUAGE (${context.language}): What does it look/feel/sound like for ${context.characterProfile?.firstName || 'the Resonator'}?
-If player conditions like 'ResonanceBurn' are active, narrate how this might affect the surge (e.g., "The surge erupts, but feels strained, less potent than you'd hope, a consequence of the lingering Resonance Burn...").
+The player has unleashed a "Resonance Surge," a raw, potent burst of their power over the Weave, allowing them to attempt one freeform action.
+The action they are attempting is: "${customAction}"
 
-Based on the current context, choose ONE potent, beneficial effect for the surge:
-1.  **Echo Amplification/Clarification:** If there are active echoes, describe them becoming vividly clear or stronger. All current "whisperingEchoes" should be updated (e.g., intensityHint upgraded, a new detail added like 'clarity' or 'emotionalUndercurrent', weavingCost temporarily nullified). The updated echoes (text IN TARGET LANGUAGE) should be provided in the response.
-2.  **Dissonance Dampening:** If a Dissonance effect is active, describe the surge pushing it back or weakening it temporarily (for 1-2 turns/choices). Update "dissonanceEffectInScene" (description IN TARGET LANGUAGE) in the response to reflect this temporary change.
-3.  **Insight Flash/Lore Revelation:** Reveal a significant "LoreFragmentData" or a concise "LoreEntryData" (title and content IN TARGET LANGUAGE) directly related to a pressing mystery, the current location, or a key item. This should be a breakthrough.
-4.  **Item Awakening:** If a significant item is in inventory (especially one with untapped echoes), the surge forcibly awakens one of its hidden "WhisperingEchoDetail"s. Provide this new echo (text IN TARGET LANGUAGE) in "whisperingEchoes".
-5.  **Hotspot Activation/Revelation:** If an Echo Hotspot is present, the surge could fully awaken its power, revealing a major echo or lore, or even transform/resolve the hotspot.
+Narrate the outcome of this powerful, freeform attempt IN THE TARGET LANGUAGE (${context.language}).
+- The "scene" text must describe the surge itself and the direct consequences of their action.
+- This is a moment of great power, but not omnipotence.
+- If the action is creative and plausible within the fantasy setting, describe its success, even if strained.
+- If the action is ambitious, narrate a partial success or a surprising, unintended side effect.
+- If the action is impossible (e.g., "I fly to the moon," "I instantly kill the ancient dragon"), describe the power fizzling out gracefully, the attempt failing in a thematic way that reveals something about the world's rules, or the surge manifesting in an uncontrolled, minor way. Do not punish the player harshly, but show the limits of their power.
+- The outcome should always move the story forward, even if it's just by providing new information.
 
-The "scene" text should narrate the surge and its immediate, tangible outcome IN THE TARGET LANGUAGE.
-Provide new "choices" IN THE TARGET LANGUAGE relevant to the situation AFTER the surge's effects.
-"imagePrompt" is OPTIONAL but recommended if the surge is visually spectacular or significantly changes perception/environment.
-
-Crucially, include "suggestedResonanceSurgeCooldown": (number between 3 and 7) in the response. This indicates how many turns until the ability can be used again.
-A potential "playerConditionUpdate" can be added if the surge is particularly taxing (e.g. 'ResonanceBurn' for a short duration if it wasn't already present, or 'Headache').
-
-Ensure the JSON response adheres to GeminiResponseData, with all player-facing text in ${context.language}.
+After narrating the outcome, provide a new set of "choices" (IN TARGET LANGUAGE) for the player to continue the game.
+You MUST suggest a cooldown for the surge ability by providing "suggestedResonanceSurgeCooldown": (a number between 4 and 8) in the response.
+Optionally, add a "playerConditionUpdate" (description IN TARGET LANGUAGE) like 'ResonanceBurn' or 'EchoSickness' to represent the strain of this powerful act.
+"imagePrompt" is highly recommended here to visualize the spectacular effect of the surge.
+Ensure the final JSON response adheres to GeminiResponseData, with all player-facing text in ${context.language}.
 `;
 
 

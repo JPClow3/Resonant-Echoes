@@ -815,6 +815,94 @@
         transform: scale(0.98);
         filter: brightness(0.95);
     }
+
+    /* Map Modal Styles */
+    .map-container {
+        background-image: radial-gradient(circle, var(--divider-color) 1px, transparent 1px);
+        background-size: 20px 20px;
+        background-color: var(--background-primary);
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: 2px solid var(--divider-color);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    .map-location-dot {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background-color: var(--accent-secondary);
+        border-radius: 50%;
+        border: 2px solid var(--background-primary);
+        transform: translate(-50%, -50%);
+        transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+        z-index: 1;
+    }
+    .map-location-dot:hover {
+        transform: translate(-50%, -50%) scale(1.8);
+        background-color: var(--accent-primary);
+        z-index: 2;
+    }
+    .map-location-dot.current-location {
+        background-color: var(--magical-positive-color);
+        box-shadow: 0 0 12px var(--magical-positive-color), 0 0 6px var(--magical-positive-color);
+        animation: gentlePulse 1.5s infinite;
+        z-index: 3;
+    }
+    .map-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        bottom: 150%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--lore-keyword-tooltip-bg);
+        color: var(--lore-keyword-tooltip-text);
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: opacity 0.2s, visibility 0.2s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .map-location-dot:hover .map-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    /* Echo Weaving Modal Styles */
+    .echo-weaving-nexus {
+        border: 3px dashed var(--magical-echo-hint-border);
+        border-radius: 50%;
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        animation: synthesisPulseActive 2.5s infinite ease-in-out;
+    }
+    .echo-weaving-nexus.drop-active {
+        background-color: color-mix(in srgb, var(--magical-echo-hint-bg, var(--background-secondary)) 50%, transparent);
+        box-shadow: 0 0 20px var(--magical-echo-hint-color);
+    }
+    .echo-orb {
+        cursor: grab;
+        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .echo-orb:active {
+        cursor: grabbing;
+        transform: scale(1.1);
+        opacity: 0.8;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Custom Action Input Style */
+    .custom-action-input {
+        border: 2px solid var(--magical-positive-border);
+        box-shadow: 0 0 15px var(--magical-positive-color), inset 0 0 8px color-mix(in srgb, var(--magical-positive-color) 40%, transparent);
+        animation: resonanceSurgeReadyPulse 2s infinite ease-in-out;
+    }
+
   </style>
 <link rel="stylesheet" href="/index.css">
 </head>

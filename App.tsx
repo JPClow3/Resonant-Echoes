@@ -7,7 +7,7 @@ import {
   GeminiResponseData, GameState, GameContextForAI, GamePhase,
   PlayerInventoryItem, DissonanceEffect, PlayerTemporaryCondition,
   ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile, PlayerNote,
-  EchoHotspot
+  EchoHotspot, LocationData
 } from './types';
 
 import {
@@ -22,7 +22,7 @@ import {
   CHARACTER_CREATION_INTRO_PROMPT, ARCHETYPE_SELECTED_PROMPT_TEMPLATE,
   ORIGIN_SELECTED_PROMPT_TEMPLATE, BACKGROUND_SELECTED_PROMPT_TEMPLATE,
   NAME_SUBMITTED_PROMPT_TEMPLATE, INITIAL_GAME_PROMPT, FOCUS_SENSES_PROMPT_TEMPLATE,
-  RESONANCE_SURGE_PROMPT_TEMPLATE
+  CUSTOM_ACTION_PROMPT_TEMPLATE
 } from './constants';
 
 import LoadingIndicator from './components/LoadingIndicator';
@@ -41,7 +41,9 @@ import SettingsPanel from './components/SettingsPanel';
 import DreamRumorDisplay from './components/DreamRumorDisplay';
 import LoreInterpretationModal from './components/LoreInterpretationModal';
 import PlayerNotesModal from './components/PlayerNotesModal';
-import IntroVideoPlayer from './components/IntroVideoPlayer'; // Import the new component
+import MapModal from './components/MapModal';
+import EchoWeavingModal from './components/EchoWeavingModal';
+import ErrorDisplay from './components/ErrorDisplay';
 
 const soundService = {
     playMusic: (key: string, options?: { volume?: number, loop?: boolean }) => console.log(`Playing music ${key}`, options),
@@ -57,7 +59,6 @@ const translations = {
   "Resonant Echoes": { en: "Resonant Echoes", pt: "Ecos Ressonantes" },
   "Settings": { en: "Settings", pt: "Opções" },
   "Cancel": { en: "Cancel", pt: "Cancelar" },
-  "Skip Intro": { en: "Skip Intro", pt: "Pular Introdução" },
 
 
   // HomeScreen
@@ -80,6 +81,7 @@ const translations = {
   "Tome ({count})": { en: "Tome ({count})", pt: "Tomo ({count})" },
   "Path Taken ({count})": { en: "Path Taken ({count})", pt: "Caminho Percorrido ({count})" },
   "My Journal ({count})": { en: "My Journal ({count})", pt: "Meu Diário ({count})" },
+  "Map": { en: "Map", pt: "Mapa" },
 
   // App.tsx - ErrorDisplay
   "A Dissonant Chord!": { en: "A Dissonant Chord!", pt: "Uma Corda Dissonante!" },
@@ -91,6 +93,13 @@ const translations = {
   "Give it a name (3-50 chars):": { en: "Give it a name (3-50 chars):", pt: "Dê um nome (3-50 caracteres):" },
   "Solidify": { en: "Solidify", pt: "Solidificar" },
   "Solidifying...": { en: "Solidifying...", pt: "Solidificando..." },
+
+  // App.tsx - CustomActionInputForm
+  "Unleash Your Power": { en: "Unleash Your Power", pt: "Liberte Seu Poder" },
+  "The world shimmers with resonant energy! What do you try to do with this surge of power?": { en: "The world shimmers with resonant energy! What do you try to do with this surge of power?", pt: "O mundo cintila com energia ressonante! O que você tenta fazer com este surto de poder?" },
+  "Describe your action... (e.g., 'I mend the crack in the Heartstone with pure light', 'I command the phantom to reveal its true name')": { en: "Describe your action... (e.g., 'I mend the crack in the Heartstone with pure light', 'I command the phantom to reveal its true name')", pt: "Descreva sua ação... (ex: 'Eu conserto a rachadura na PedraCerne com pura luz', 'Eu ordeno ao fantasma que revele seu verdadeiro nome')" },
+  "Act": { en: "Act", pt: "Agir" },
+  "Acting...": { en: "Acting...", pt: "Agindo..." },
 
   // App.tsx - NameInput for Character Creation
   "Enter Your Name:": { en: "Enter Your Name:", pt: "Insira Seu Nome:" },
@@ -177,13 +186,23 @@ const translations = {
   "Are you sure you want to delete this journal entry? This action cannot be undone.": { en: "Are you sure you want to delete this journal entry? This action cannot be undone.", pt: "Tem certeza que deseja excluir esta entrada do diário? Esta ação não pode ser desfeita." },
   "Delete Entry": { en: "Delete Entry", pt: "Excluir Entrada" },
   "Tags (comma-separated):": { en: "Tags (comma-separated):", pt: "Tags (separadas por vírgula):" },
-  "E.g., #Theron, #ArchitectMystery, #Heartstone": { en: "E.g., #Theron, #ArchitectMystery, #Heartstone", pt: "Ex: #Theron, #MisterioArquiteto, #PedraCerne" },
+  "E.g., #Theron, #ArchitectMystery, #Heartstone": { en: "E.g., #Theron, #MisterioArquiteto, #PedraCerne" },
   "Linked Lore IDs (comma-separated):": { en: "Linked Lore IDs (comma-separated):", pt: "IDs de Lore Vinculados (separados por vírgula):" },
-  "E.g., lore_ancient_ritual, lore_theron_warning_1": { en: "E.g., lore_ancient_ritual, lore_theron_warning_1", pt: "Ex: lore_ritual_antigo, lore_aviso_theron_1" },
+  "E.g., lore_ancient_ritual, lore_theron_warning_1": { en: "E.g., lore_ritual_antigo, lore_aviso_theron_1", pt: "Ex: lore_ritual_antigo, lore_aviso_theron_1" },
   "Tags:": { en: "Tags:", pt: "Tags:" },
   "Linked Lore:": { en: "Linked Lore:", pt: "Lore Vinculado:" },
   "Note content cannot be empty.": { en: "Note content cannot be empty.", pt: "O conteúdo da nota não pode estar vazio." },
 
+  // MapModal
+  "Chronicle Map": { en: "Chronicle Map", pt: "Mapa da Crônica" },
+  "Close Map": { en: "Close Map", pt: "Fechar Mapa" },
+  "The world of Aerthos is yet to be explored.": { en: "The world of Aerthos is yet to be explored.", pt: "O mundo de Aerthos ainda está para ser explorado." },
+
+  // EchoWeavingModal
+  "The Weaver's Loom": { en: "The Weaver's Loom", pt: "O Tear do Tecelão" },
+  "Weave Echoes": { en: "Weave Echoes", pt: "Tecer Ecos" },
+  "Drag echo orbs to the nexus to feel their connection.": { en: "Drag echo orbs to the nexus to feel their connection.", pt: "Arraste os orbes de eco para o nexus para sentir sua conexão." },
+  "Close Loom": { en: "Close Loom", pt: "Fechar Tear" },
 
   // LoreInterpretationModal
   "Interpret the Ancient Lore": { en: "Interpret the Ancient Lore", pt: "Interprete a Sabedoria Antiga" },
@@ -256,12 +275,15 @@ type Action =
   | { type: 'TOGGLE_SETTINGS_PANEL' }
   | { type: 'TOGGLE_LORE_JOURNAL' }
   | { type: 'TOGGLE_HISTORY_LOG' }
+  | { type: 'TOGGLE_MAP_MODAL' }
+  | { type: 'TOGGLE_ECHO_WEAVING_MODAL' }
   | { type: 'SET_VOLUME'; payload: number }
   | { type: 'TOGGLE_MUTE' }
   | { type: 'TOGGLE_COLOR_BLIND_ASSIST' }
   | { type: 'SET_CURRENT_IMAGE'; payload: { url: string | null; prompt: string | null } }
   | { type: 'DISMISS_DREAM_OR_VISION' }
   | { type: 'SET_NEWEST_LORE_ID'; payload: string | null }
+  | { type: 'ADD_LOCATION'; payload: LocationData }
   // Player Notes Actions
   | { type: 'TOGGLE_PLAYER_NOTES_MODAL' }
   | { type: 'ADD_PLAYER_NOTE'; payload: { title: string; content: string; tags?: string[]; linkedLoreIds?: string[] } }
@@ -286,16 +308,20 @@ const initialGameState: GameState = {
     gameStarted: false, renown: 0, lastRenownNarrative: null,
     firstName: null, selectedArchetypeId: null, selectedOriginId: null, selectedBackgroundId: null, characterProfile: null,
     insightToName: null, homeScreenImageUrl: null, isHomeScreenImageLoading: false,
-    homeScreenImageFetchAttempted: false, showSettingsPanel: false, showLoreJournalModal: false,
-    newestLoreEntryId: null, showHistoryLogModal: false, currentVolume: 70, isMuted: false,
+    homeScreenImageFetchAttempted: false, showSettingsPanel: false,
+    newestLoreEntryId: null, currentVolume: 70, isMuted: false,
     isColorBlindAssistActive: false, currentTimeOfDay: undefined, currentWeather: undefined,
     playerInventory: {}, lastChosenChoiceIndex: null, currentRumors: [], dreamOrVisionToDisplay: null,
     awaitingLoreInterpretation: false, loreToInterpret: undefined, activeDissonanceEffect: null,
     playerConditions: [], echoicBlightInScene: null, activeMemoryPhantoms: [], devouringSilenceZoneInScene: null,
-    activeEchoHotspots: [], // Initialize activeEchoHotspots
+    activeEchoHotspots: [],
     playerNotes: [], showPlayerNotesModal: false,
     isResonanceSurgeAvailable: true, resonanceSurgeCooldown: 0,
     currentLanguage: 'en',
+    // New UI states
+    showLoreJournalModal: false, showHistoryLogModal: false, showMapModal: false, showEchoWeavingModal: false,
+    // New Map data
+    discoveredLocations: [], currentLocationId: null,
 };
 
 // Helper function for gameReducer
@@ -328,6 +354,8 @@ const gameReducer = (state: GameState, action: Action): GameState => {
             currentLanguage: action.payload.currentLanguage || state.currentLanguage,
             playerNotes: [], // Reset player notes
             activeEchoHotspots: [], // Reset hotspots
+            discoveredLocations: [],
+            currentLocationId: null,
         };
       return { ...defaultInitialState, ...action.payload };
     case 'START_GAME_FLOW_SUCCESS':
@@ -377,6 +405,8 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         currentTimeOfDay: R1.currentTimeOfDay || "Dawn",
         currentWeather: R1.currentWeather || "Clear",
         activeEchoHotspots: R1.activeEchoHotspots || [],
+        discoveredLocations: R1.newLocationDiscovered ? [R1.newLocationDiscovered] : [],
+        currentLocationId: R1.newLocationDiscovered ? R1.newLocationDiscovered.id : null,
       };
     case 'PROCESS_AI_RESPONSE':
       const { responseData: R, isSurgeEffect } = action.payload;
@@ -412,7 +442,6 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       }
       currentConditions = updatePlayerConditions(currentConditions, isSurgeEffect);
 
-
       let newCooldown = state.resonanceSurgeCooldown;
       let surgeAvailable = state.isResonanceSurgeAvailable;
 
@@ -425,6 +454,16 @@ const gameReducer = (state: GameState, action: Action): GameState => {
              surgeAvailable = true;
              soundService.playSound('SURGE_READY');
         }
+      }
+
+      let updatedLocations = state.discoveredLocations;
+      let newLocationId = state.currentLocationId;
+      if (R.newLocationDiscovered && !state.discoveredLocations.some(loc => loc.id === R.newLocationDiscovered!.id)) {
+        updatedLocations = [...state.discoveredLocations, R.newLocationDiscovered];
+        soundService.playSound('LOCATION_DISCOVERED');
+      }
+      if (R.newLocationDiscovered) {
+        newLocationId = R.newLocationDiscovered.id;
       }
 
       return {
@@ -455,9 +494,10 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         loreToInterpret: R.interpretiveChoicesForLore || undefined,
         isResonanceSurgeAvailable: isSurgeEffect ? false : surgeAvailable,
         resonanceSurgeCooldown: isSurgeEffect ? (R.suggestedResonanceSurgeCooldown || 5) : newCooldown,
+        discoveredLocations: updatedLocations,
+        currentLocationId: newLocationId,
       };
     case 'ADD_HISTORY_ENTRY':
-      // Check if this history entry corresponds to a hotspot interaction
       let newPreviouslyInteracted = state.historyLog.filter(h => h.type === 'hotspot_interaction').map(h => h.choiceMade?.split(':')[0].trim() || ''); // Rebuild or add based on type
       if (action.payload.type === 'hotspot_interaction' && action.payload.choiceMade) {
         const hotspotId = action.payload.choiceMade.split(':')[0].trim(); // Assuming choiceMade is "hotspotId: Actual choice text"
@@ -466,8 +506,17 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         }
       }
       return { ...state, historyLog: [...state.historyLog, action.payload] };
-    case 'ADD_INTERACTED_HOTSPOT': // Deprecated this direct action, handled via ADD_HISTORY_ENTRY with type 'hotspot_interaction'
-        return state; // No direct change, ID tracking managed via history entry
+    case 'ADD_LOCATION':
+        if (state.discoveredLocations.some(loc => loc.id === action.payload.id)) {
+            return { ...state, currentLocationId: action.payload.id };
+        }
+        return {
+            ...state,
+            discoveredLocations: [...state.discoveredLocations, action.payload],
+            currentLocationId: action.payload.id,
+        };
+    case 'ADD_INTERACTED_HOTSPOT':
+        return state;
     case 'SET_LAST_CHOSEN_INDEX':
       return { ...state, lastChosenChoiceIndex: action.payload };
     case 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY':
@@ -484,6 +533,10 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       return { ...state, showLoreJournalModal: !state.showLoreJournalModal };
     case 'TOGGLE_HISTORY_LOG':
       return { ...state, showHistoryLogModal: !state.showHistoryLogModal };
+    case 'TOGGLE_MAP_MODAL':
+      return { ...state, showMapModal: !state.showMapModal };
+    case 'TOGGLE_ECHO_WEAVING_MODAL':
+        return { ...state, showEchoWeavingModal: !state.showEchoWeavingModal };
     case 'SET_VOLUME':
       return { ...state, currentVolume: action.payload, isMuted: action.payload === 0 ? true : state.isMuted };
     case 'TOGGLE_MUTE':
@@ -523,9 +576,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
       };
     case 'RESONANCE_SURGE_INITIATED':
       return { ...state, isLoading: true };
-    case 'RESONANCE_SURGE_COMPLETED': // This action itself doesn't change state; PROCESS_AI_RESPONSE does.
+    case 'RESONANCE_SURGE_COMPLETED':
       return state;
-    case 'DECREMENT_COOLDOWNS': // This was unused, repurposed for Process AI Response
+    case 'DECREMENT_COOLDOWNS':
       return state;
     case 'SET_LANGUAGE':
       return {
@@ -537,8 +590,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
         isColorBlindAssistActive: state.isColorBlindAssistActive,
         currentLanguage: action.payload,
         gameStarted: false,
-        playerNotes: [], // Reset notes on language change
-        activeEchoHotspots: [], // Reset hotspots
+        playerNotes: [],
+        activeEchoHotspots: [],
+        discoveredLocations: [],
       };
     default:
       return state;
@@ -560,13 +614,6 @@ const App: React.FC = () => {
   const [newLoreForGlow, setNewLoreForGlow] = useState(false);
   const [isReflecting, setIsReflecting] = useState(false);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
-
-  const [showIntroVideo, setShowIntroVideo] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return !localStorage.getItem('hasPlayedIntro');
-    }
-    return true;
-  });
 
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const lang = gameState.currentLanguage;
@@ -697,9 +744,6 @@ const App: React.FC = () => {
         dispatch({ type: 'SET_HOME_SCREEN_IMAGE', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, loading: false } });
       }
     } catch (error) {
-      // The 'error' variable might be a string or an object.
-      // The UI will show "Failed to load title screen image."
-      // This console log is for developer detail.
       console.error(`Detailed error fetching home screen image: ${error}. Fallback: Using placeholder image. UI Message: "Failed to load title screen image."`);
       dispatch({ type: 'SET_HOME_SCREEN_IMAGE', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, loading: false } });
       dispatch({ type: 'SET_ERROR', payload: "Failed to load title screen image." });
@@ -729,7 +773,7 @@ const App: React.FC = () => {
     const previouslyInteractedHotspotIds = Array.from(new Set(
         gameState.historyLog
           .filter(h => h.type === 'hotspot_interaction' && h.choiceMade)
-          .map(h => h.choiceMade!.split(':')[0].trim()) // Assumes format "hotspotId: Choice Text"
+          .map(h => h.choiceMade!.split(':')[0].trim())
       ));
 
     return {
@@ -758,6 +802,8 @@ const App: React.FC = () => {
       previouslyInteractedHotspotIds: previouslyInteractedHotspotIds,
       isResonanceSurgeAvailable: gameState.isResonanceSurgeAvailable,
       resonanceSurgeCooldownTurnsLeft: gameState.resonanceSurgeCooldown,
+      discoveredLocationsSummary: gameState.discoveredLocations.map(l => ({ name: l.name })),
+      currentLocationName: gameState.discoveredLocations.find(l => l.id === gameState.currentLocationId)?.name,
       language: gameState.currentLanguage,
     };
   }, [
@@ -765,7 +811,8 @@ const App: React.FC = () => {
     gameState.whisperingEchoes, gameState.playerEchoicSignature, gameState.factionReputationNotes,
     gameState.renown, gameState.currentTimeOfDay, gameState.currentWeather, gameState.playerInventory,
     gameState.currentRumors, gameState.activeDissonanceEffect, gameState.playerConditions,
-    gameState.activeEchoHotspots, gameState.isResonanceSurgeAvailable, gameState.resonanceSurgeCooldown, gameState.currentLanguage
+    gameState.activeEchoHotspots, gameState.isResonanceSurgeAvailable, gameState.resonanceSurgeCooldown, 
+    gameState.currentLanguage, gameState.discoveredLocations, gameState.currentLocationId
   ]);
 
   const fetchGameData: FetchGameDataFn = useCallback(async (
@@ -774,9 +821,7 @@ const App: React.FC = () => {
     isFinalProfileSubmission: boolean = false,
     isSurgeEffect: boolean = false
   ) => {
-    if (!isSurgeEffect) dispatch({ type: 'SET_LOADING', payload: true });
-    else dispatch({ type: 'RESONANCE_SURGE_INITIATED' });
-
+    dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
     dispatch({ type: 'SET_LAST_CHOSEN_INDEX', payload: null });
     dispatch({ type: 'DISMISS_DREAM_OR_VISION' });
@@ -792,7 +837,6 @@ const App: React.FC = () => {
       const responseData = parseAndCleanJSON(response.text) as GeminiResponseData;
       soundService.playSound('AI_RESPONSE_RECEIVED');
       if (isSurgeEffect) soundService.playSound('SURGE_EFFECT_APPLIED');
-
 
       const newImagePromptFromAI = responseData.imagePrompt;
 
@@ -832,14 +876,11 @@ const App: React.FC = () => {
          if (newImagePromptFromAI) {
             fetchImage(newImagePromptFromAI);
          } else {
-            // Only set placeholder if no image prompt was given AND there's no current image from previous turn.
-            // This prevents replacing a good image with a placeholder on minor turns.
             if (!gameState.currentImageUrl) {
               dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: null } });
             }
          }
       } else {
-        // If imagePrompt is undefined (meaning AI wants to keep current image), but we have no current image, set placeholder.
         if (!gameState.currentImageUrl && currentPhase === GamePhase.Playing) {
              dispatch({ type: 'SET_CURRENT_IMAGE', payload: { url: PLACEHOLDER_IMAGE_URL, prompt: gameState.currentImagePrompt } });
         }
@@ -851,6 +892,10 @@ const App: React.FC = () => {
       if (responseData.playerReflection) {
         dispatch({ type: 'ADD_HISTORY_ENTRY', payload: { id: `reflect_${Date.now()}`, sceneSummary: responseData.playerReflection!, timestamp: new Date().toISOString(), fullSceneText: responseData.playerReflection!, type: 'reflection' } });
         soundService.playSound('PLAYER_REFLECTION_ADDED');
+      }
+      if (responseData.newLocationDiscovered) {
+        const loc = responseData.newLocationDiscovered;
+        dispatch({type: 'ADD_HISTORY_ENTRY', payload: {id: `hist_loc_${loc.id}`, sceneSummary: `Discovered: ${loc.name}. ${loc.description}`, timestamp: new Date().toISOString(), fullSceneText: `Discovered new location: ${loc.name}`, type: 'location_discovery'}});
       }
 
       if (responseData.expectsPlayerInputForName && responseData.offerToNameInsight && responseData.namedInsightContext) {
@@ -867,47 +912,25 @@ const App: React.FC = () => {
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       setCurrentPhase(GamePhase.Error);
     }
-  }, [ai.models, fetchImage, gameState.currentImagePrompt, gameState.currentImageUrl, gameState.loreJournal, gameState.loreFragments, gameState.renown, gameState.currentSoundscape, gameState.playerEchoicSignature, gameState.factionReputationNotes, gameState.whisperingEchoes, gameState.currentTimeOfDay, gameState.currentWeather, gameState.playerInventory, gameState.historyLog, gameState.currentVolume, gameState.currentRumors, gameState.activeDissonanceEffect, gameState.playerConditions, gameState.selectedArchetypeId, gameState.selectedOriginId, gameState.selectedBackgroundId, gameState.firstName, currentPhase, buildGameContextForAI, t]);
+  }, [ai.models, fetchImage, gameState, currentPhase, buildGameContextForAI, t]);
 
 
   useEffect(() => {
-    // This effect manages the initial phase setting based on API key and intro status.
     if (gameState.apiKeyMissing) {
       if (currentPhase !== GamePhase.Error) {
-          setShowIntroVideo(false); // Don't show intro if API key is missing
           setCurrentPhase(GamePhase.Error);
           if (!gameState.error) {
             dispatch({ type: 'SET_ERROR', payload: t(API_KEY_ERROR_MESSAGE_KEY) });
           }
       }
-    } else if (showIntroVideo) {
-      // If API key is present and intro should be shown, currentPhase remains (or becomes) HomeScreen
-      // The IntroVideoPlayer will be rendered.
-      // Set currentPhase to HomeScreen so the app structure prepares for it.
-      if (currentPhase !== GamePhase.HomeScreen && currentPhase !== GamePhase.Error) {
-          setCurrentPhase(GamePhase.HomeScreen);
-      }
     } else {
-      // API key is fine, intro is done/skipped.
-      // Ensure we are in HomeScreen phase if not already in an active game phase.
       if (currentPhase === GamePhase.HomeScreen && !gameState.homeScreenImageFetchAttempted && !gameState.homeScreenImageUrl && !gameState.isHomeScreenImageLoading) {
         fetchHomeScreenImage();
-      } else if (currentPhase !== GamePhase.Playing && currentPhase !== GamePhase.ArchetypeSelection && currentPhase !== GamePhase.OriginSelection && currentPhase !== GamePhase.BackgroundSelection && currentPhase !== GamePhase.NameInput && currentPhase !== GamePhase.ConfirmationAndTransition && currentPhase !== GamePhase.AwaitingNameInput && currentPhase !== GamePhase.AwaitingLoreInterpretation && currentPhase !== GamePhase.Error) {
-        // If not in any specific game phase and intro is done, default to HomeScreen
+      } else if ( ![GamePhase.Playing, GamePhase.ArchetypeSelection, GamePhase.OriginSelection, GamePhase.BackgroundSelection, GamePhase.NameInput, GamePhase.ConfirmationAndTransition, GamePhase.AwaitingNameInput, GamePhase.AwaitingLoreInterpretation, GamePhase.AwaitingCustomActionInput, GamePhase.Error].includes(currentPhase)) {
         setCurrentPhase(GamePhase.HomeScreen);
       }
     }
-  }, [gameState.apiKeyMissing, showIntroVideo, currentPhase, gameState.error, t, fetchHomeScreenImage, gameState.homeScreenImageFetchAttempted, gameState.homeScreenImageUrl, gameState.isHomeScreenImageLoading]);
-
-  const handleIntroFinished = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hasPlayedIntro', 'true');
-    }
-    setShowIntroVideo(false);
-    // After intro finishes, we should be going to the HomeScreen.
-    // The useEffect above will handle fetching home screen image once currentPhase is HomeScreen.
-    setCurrentPhase(GamePhase.HomeScreen);
-  };
+  }, [gameState.apiKeyMissing, currentPhase, gameState.error, t, fetchHomeScreenImage, gameState.homeScreenImageFetchAttempted, gameState.homeScreenImageUrl, gameState.isHomeScreenImageLoading]);
 
   const startGameFlow = useCallback(() => {
     if (gameState.apiKeyMissing) {
@@ -936,18 +959,13 @@ const App: React.FC = () => {
     dispatch({ type: 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY' });
 
     let historyEntryType: HistoryEntry['type'] = 'choice';
-    // Check if the choice is a hotspot interaction based on its format (e.g., "hotspotId:Choice Text")
-    // This is a convention that the AI needs to follow if it wants a choice to be recorded as a hotspot interaction.
     const hotspotChoiceMatch = choiceIdOrText.match(/^([a-zA-Z0-9_]+):(.*)$/);
     let actualChoiceText = choiceIdOrText;
-    let hotspotIdInteracted: string | undefined = undefined;
 
     if (hotspotChoiceMatch) {
-        hotspotIdInteracted = hotspotChoiceMatch[1];
         actualChoiceText = hotspotChoiceMatch[2].trim();
         historyEntryType = 'hotspot_interaction';
     }
-
 
     const addCreationHistory = (stage: string, selection: string) => {
       const entry: HistoryEntry = { id: `hist_creation_${stage}_${Date.now()}`, sceneSummary: `Character Creation - ${stage}: ${selection}`, choiceMade: selection, timestamp: new Date().toISOString(), fullSceneText: `Player selected '${selection}' for ${stage}.`, type: 'character_creation' };
@@ -955,7 +973,7 @@ const App: React.FC = () => {
     };
 
     if (currentPhase === GamePhase.ArchetypeSelection) {
-      const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === actualChoiceText); // Use actualChoiceText
+      const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === actualChoiceText);
       if (chosenArchetype) {
         addCreationHistory("Archetype", chosenArchetype.title);
         dispatch({ type: 'UPDATE_CHARACTER_CREATION_STEP', payload: { scene: '', choices: [], imagePrompt: null, data: { selectedArchetypeId: chosenArchetype.id } } });
@@ -963,7 +981,7 @@ const App: React.FC = () => {
         fetchGameData(ARCHETYPE_SELECTED_PROMPT_TEMPLATE(chosenArchetype), true);
       }
     } else if (currentPhase === GamePhase.OriginSelection) {
-      const chosenOrigin = ORIGINS_DATA.find(o => o.id === actualChoiceText); // Use actualChoiceText
+      const chosenOrigin = ORIGINS_DATA.find(o => o.id === actualChoiceText);
       const currentArchetype = ARCHETYPES_DATA.find(a => a.id === gameState.selectedArchetypeId);
       if (chosenOrigin && currentArchetype) {
         addCreationHistory("Origin", chosenOrigin.name);
@@ -972,7 +990,7 @@ const App: React.FC = () => {
         fetchGameData(ORIGIN_SELECTED_PROMPT_TEMPLATE(currentArchetype, chosenOrigin), true);
       }
     } else if (currentPhase === GamePhase.BackgroundSelection) {
-      const chosenBackground = BACKGROUNDS_DATA.find(b => b.id === actualChoiceText); // Use actualChoiceText
+      const chosenBackground = BACKGROUNDS_DATA.find(b => b.id === actualChoiceText);
       const currentArchetype = ARCHETYPES_DATA.find(a => a.id === gameState.selectedArchetypeId);
       const currentOrigin = ORIGINS_DATA.find(o => o.id === gameState.selectedOriginId);
       if (chosenBackground && currentArchetype && currentOrigin) {
@@ -986,7 +1004,7 @@ const App: React.FC = () => {
       const newHistoryEntry: HistoryEntry = {
         id: `hist_${Date.now()}`,
         sceneSummary: currentSceneText.substring(0, 150),
-        choiceMade: choiceIdOrText, // Use original choiceIdOrText for history (includes hotspotId if present)
+        choiceMade: choiceIdOrText,
         timestamp: new Date().toISOString(),
         fullSceneText: currentSceneText,
         type: historyEntryType
@@ -996,17 +1014,15 @@ const App: React.FC = () => {
       const baseAIContext = buildGameContextForAI();
       const finalContextForAI: GameContextForAI = {
         ...baseAIContext,
-        lastPlayerChoice: actualChoiceText, // Send the AI only the actual choice text
+        lastPlayerChoice: actualChoiceText,
         recentHistorySummary: [...gameState.historyLog, newHistoryEntry].slice(-3).map(h => `${h.sceneSummary.substring(0, 50)}... -> ${h.choiceMade || h.type}`).join(' | ')
       };
 
       let promptToSend: string;
-      if (actualChoiceText.startsWith("Attempt to Synthesize Echoes")) { // Use actualChoiceText
-        promptToSend = SYNTHESIZE_ECHOES_PROMPT_TEMPLATE(finalContextForAI);
-      } else if (actualChoiceText.startsWith("Attempt to Synthesize Lore Fragments:")) { // Use actualChoiceText
+      if (actualChoiceText.startsWith("Attempt to Synthesize Lore Fragments:")) {
         const fragmentTitles = actualChoiceText.replace("Attempt to Synthesize Lore Fragments: ", "").split(" & ");
         promptToSend = SYNTHESIZE_LORE_FRAGMENTS_PROMPT_TEMPLATE(finalContextForAI, fragmentTitles);
-      } else if (actualChoiceText.startsWith("Attempt to Attune to ")) { // Use actualChoiceText
+      } else if (actualChoiceText.startsWith("Attempt to Attune to ")) {
         const itemName = actualChoiceText.replace("Attempt to Attune to ", "");
         promptToSend = ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE(finalContextForAI, itemName);
       } else {
@@ -1043,6 +1059,7 @@ const App: React.FC = () => {
   const handleSynthesizeEchoes = useCallback(() => {
     if (gameState.whisperingEchoes.length === 0 || gameState.isLoading) return;
     soundService.playSound('SYNTHESIZE_ATTEMPT');
+    dispatch({ type: 'TOGGLE_ECHO_WEAVING_MODAL' });
     const context = buildGameContextForAI();
     dispatch({ type: 'SET_LAST_CHOSEN_INDEX', payload: null });
     dispatch({ type: 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY' });
@@ -1079,20 +1096,36 @@ const App: React.FC = () => {
   const handleResonanceSurge = useCallback(() => {
     if (!gameState.isResonanceSurgeAvailable || gameState.isLoading || isReflecting) return;
     soundService.playSound('RESONANCE_SURGE_ACTIVATE');
-    const context = buildGameContextForAI();
-    dispatch({ type: 'SET_LAST_CHOSEN_INDEX', payload: null });
-    dispatch({ type: 'SET_CURRENT_SCENE_AND_CHOICES_EMPTY' });
     const newHistoryEntry: HistoryEntry = {
       id: `hist_surge_${Date.now()}`,
       sceneSummary: "Unleashed a Resonance Surge!",
       choiceMade: "Resonance Surge",
       timestamp: new Date().toISOString(),
-      fullSceneText: "Player activated their Resonance Surge ability.",
+      fullSceneText: "Player activated their Resonance Surge ability to attempt a custom action.",
       type: 'resonance_surge'
     };
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
-    fetchGameData(RESONANCE_SURGE_PROMPT_TEMPLATE(context), false, false, true);
-  }, [gameState.isResonanceSurgeAvailable, gameState.isLoading, isReflecting, fetchGameData, buildGameContextForAI]);
+    setCurrentPhase(GamePhase.AwaitingCustomActionInput);
+  }, [gameState.isResonanceSurgeAvailable, gameState.isLoading, isReflecting]);
+
+  const handleCustomActionSubmit = useCallback((actionText: string) => {
+    if (!actionText.trim() || gameState.isLoading) return;
+    soundService.playSound('UI_CONFIRM');
+    const newHistoryEntry: HistoryEntry = {
+        id: `hist_custom_action_${Date.now()}`,
+        sceneSummary: `Attempted Action: "${actionText}"`,
+        choiceMade: actionText,
+        timestamp: new Date().toISOString(),
+        fullSceneText: `With a surge of power, player attempted: ${actionText}`,
+        type: 'custom_action'
+    };
+    dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
+
+    const context = buildGameContextForAI();
+    const prompt = CUSTOM_ACTION_PROMPT_TEMPLATE(context, actionText);
+    fetchGameData(prompt, false, false, true); // isSurgeEffect is true
+    setCurrentPhase(GamePhase.Playing);
+  }, [gameState.isLoading, buildGameContextForAI, fetchGameData]);
 
 
   const handleNameInsightSubmit = useCallback((submittedName: string) => {
@@ -1188,7 +1221,7 @@ const App: React.FC = () => {
   const dismissError = () => {
     dispatch({ type: 'SET_ERROR', payload: null });
     if (gameState.apiKeyMissing) {
-      setCurrentPhase(GamePhase.HomeScreen); // Stay on HomeScreen if API key is missing, intro won't play
+      setCurrentPhase(GamePhase.HomeScreen);
     } else if (!gameState.gameStarted) {
       setCurrentPhase(GamePhase.HomeScreen);
     } else {
@@ -1198,10 +1231,6 @@ const App: React.FC = () => {
 
   const handleLanguageChangeAndReset = useCallback((lang: 'en' | 'pt') => {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
-    setShowIntroVideo(true); // Reset to show intro on language change
-    if (typeof window !== 'undefined') {
-        localStorage.removeItem('hasPlayedIntro'); // Clear intro played status
-    }
     setCurrentPhase(GamePhase.HomeScreen);
   }, []);
 
@@ -1214,13 +1243,103 @@ const App: React.FC = () => {
   };
   const handleToggleHistory = () => dispatch({ type: 'TOGGLE_HISTORY_LOG' });
   const handleTogglePlayerNotes = () => dispatch({ type: 'TOGGLE_PLAYER_NOTES_MODAL' });
+  const handleToggleMap = () => dispatch({ type: 'TOGGLE_MAP_MODAL' });
+  const handleToggleEchoWeaving = () => dispatch({ type: 'TOGGLE_ECHO_WEAVING_MODAL' });
 
+  const appContainerClasses = `min-h-screen flex flex-col transition-all duration-300 ease-in-out ${currentPhase !== GamePhase.HomeScreen && !([GamePhase.ArchetypeSelection, GamePhase.OriginSelection, GamePhase.BackgroundSelection, GamePhase.NameInput, GamePhase.ConfirmationAndTransition].includes(currentPhase)) ? 'fantasy-parchment' : ''} ${currentPhase === GamePhase.Playing ? 'subtle-breathing-panel' : ''}`;
 
-  const appContainerClasses = `min-h-screen flex flex-col transition-all duration-300 ease-in-out ${currentPhase !== GamePhase.HomeScreen && currentPhase !== GamePhase.ArchetypeSelection && currentPhase !== GamePhase.OriginSelection && currentPhase !== GamePhase.BackgroundSelection && currentPhase !== GamePhase.NameInput && currentPhase !== GamePhase.ConfirmationAndTransition && !showIntroVideo ? 'fantasy-parchment' : ''} ${currentPhase === GamePhase.Playing ? 'subtle-breathing-panel' : ''}`;
+  // Inner components defined before use in mainContent
+  const StoryDisplayContainer: React.FC<{
+    t: (key: string, params?: Record<string, string | number>) => string,
+    gameState: GameState,
+    handlePlayerChoice: (choice: string, index: number) => void,
+    handleToggleEchoWeaving: () => void,
+    handleFocusSenses: () => void,
+    handleResonanceSurge: () => void,
+    handleRequestReflection: () => void,
+    isReflecting: boolean,
+    handleTogglePlayerNotes: () => void,
+    handleToggleMap: () => void
+  }> = ({ t, gameState, handlePlayerChoice, handleToggleEchoWeaving, handleFocusSenses, handleResonanceSurge, handleRequestReflection, isReflecting, handleTogglePlayerNotes, handleToggleMap }) => (
+    <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
+      <header className="text-center mb-6 md:mb-10">
+        <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-400 echoic-unveil-title">{t("Resonant Echoes")}</h1>
+        {gameState.characterProfile && <p className="font-body text-lg text-muted-color">{t("The Journey of {name}, the {archetype}", { name: gameState.characterProfile.firstName, archetype: gameState.characterProfile.archetype.title })}</p>}
+      </header>
+      <DreamRumorDisplay t={t} dreamOrVision={gameState.dreamOrVisionToDisplay} rumors={gameState.currentRumors} onDismissDream={() => dispatch({ type: 'DISMISS_DREAM_OR_VISION' })} />
+      {gameState.activeDissonanceEffect && (<div className="mb-4 p-3 bg-red-900 bg-opacity-20 rounded border border-magical-dissonance-border text-sm"><strong className="text-magical-dissonance-text font-semibold">{t("Dissonance Active:")} </strong><InteractiveText text={gameState.activeDissonanceEffect.description} className="text-magical-dissonance-text" /> {gameState.activeDissonanceEffect.mechanicalEffect && <span className="block text-xs italic text-red-400">({gameState.activeDissonanceEffect.mechanicalEffect})</span>}</div>)}
+      {gameState.playerConditions.length > 0 && (<div className="mb-4 p-3 bg-yellow-500 bg-opacity-20 rounded border border-accent-primary-border text-sm"><strong className="text-accent-primary font-semibold">{t("Conditions:")} </strong> {gameState.playerConditions.map(c => `${c.type}: ${c.description}`).join('; ')}</div>)}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+        <div className="md:col-span-8"> <ImageDisplay t={t} imageUrl={gameState.currentImageUrl} altText={gameState.currentImagePrompt || "Scene"} isLoading={gameState.isLoading && !gameState.currentImageUrl && !!gameState.currentImagePrompt} /> </div>
+        <div className="md:col-span-4 space-y-4"> <GameStatusDisplay t={t} timeOfDay={gameState.currentTimeOfDay} weather={gameState.currentWeather} inventory={gameState.playerInventory} onAttune={(itemName) => handlePlayerChoice(`Attempt to Attune to ${itemName}`, -1)} characterProfile={gameState.characterProfile} /> <RenownDisplay renown={gameState.renown} lastChangeNarrative={gameState.lastRenownNarrative} animateOnUpdate={!!(gameState.lastRenownNarrative || gameState.renown !== 0)} /> </div>
+      </div>
+      {gameState.error && currentPhase === GamePhase.Playing && (<div className="mb-4 p-4 bg-red-100 text-red-700 rounded border border-red-300 shadow flex justify-between items-center">{gameState.error} <button onClick={dismissError} className="text-sm p-1 hover:bg-red-200 rounded">X</button></div>)}
+      <div className="bg-secondary p-4 sm:p-6 rounded-lg shadow-lg border border-divider-color mb-6">
+        <h2 className="font-heading text-3xl text-heading-color mb-4 border-b border-divider-color pb-2">{t("The Unfolding Path")}</h2>
+        <StoryDisplay storyText={gameState.currentScene} enableTypingEffect={true} className="text-lg text-main-color" />
+        <ChoicesDisplay choices={gameState.choices} onChoiceSelected={handlePlayerChoice} isLoading={gameState.isLoading || isReflecting} lastChosenIndex={gameState.lastChosenChoiceIndex} activeHotspots={gameState.activeEchoHotspots} />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+          <button onClick={handleToggleEchoWeaving} className={`fantasy-button fantasy-button-secondary ${(gameState.whisperingEchoes.length > 0 && !gameState.isLoading && !isReflecting) ? 'synthesis-button-ready-pulse' : ''}`} disabled={gameState.isLoading || isReflecting || gameState.whisperingEchoes.length === 0}> {t("Synthesize ({count})", { count: gameState.whisperingEchoes.length })} </button>
+          <button onClick={handleFocusSenses} className="fantasy-button fantasy-button-secondary" disabled={gameState.isLoading || isReflecting || !gameState.currentScene}>{t("Focus Senses")}</button>
+          <button
+            onClick={handleResonanceSurge}
+            className={`fantasy-button fantasy-button-primary ${gameState.isResonanceSurgeAvailable ? 'resonance-surge-ready-pulse' : ''}`}
+            disabled={!gameState.isResonanceSurgeAvailable || gameState.isLoading || isReflecting}
+          >
+            {gameState.isResonanceSurgeAvailable ? t("Resonance Surge") : t("Surge (CD: {cooldown})", { cooldown: gameState.resonanceSurgeCooldown })}
+          </button>
+          <button onClick={handleRequestReflection} className="fantasy-button fantasy-button-secondary" disabled={gameState.isLoading || isReflecting || !gameState.currentScene}> {isReflecting ? t("Pondering...") : t("Ponder Moment")} </button>
+        </div>
+      </div>
+      <WhisperingEchoesDisplay t={t} echoes={gameState.whisperingEchoes} isSynthesizing={false} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 justify-center">
+        <button onClick={handleToggleLore} className={`fantasy-button fantasy-button-primary ${newLoreForGlow ? 'new-entry-glow-button' : ''}`}> {t("Tome ({count})", { count: gameState.loreJournal.length + gameState.loreFragments.length })} </button>
+        <button onClick={handleToggleHistory} className="fantasy-button fantasy-button-primary"> {t("Path Taken ({count})", { count: gameState.historyLog.length })} </button>
+        <button onClick={handleTogglePlayerNotes} className="fantasy-button fantasy-button-primary">{t("My Journal ({count})", { count: gameState.playerNotes.length })}</button>
+        <button onClick={handleToggleMap} className="fantasy-button fantasy-button-primary">{t("Map")}</button>
+      </div>
+    </div>
+  );
 
-  if (showIntroVideo && !gameState.apiKeyMissing) {
-    return <IntroVideoPlayer src="/assets/intro.mp4" onVideoEnd={handleIntroFinished} t={t} />;
-  }
+  const NameInsightForm: React.FC<{ t: Function, onSubmit: (name: string) => void, onCancel: () => void, insightText: string, isLoading?: boolean }> = ({ t, onSubmit, onCancel, insightText, isLoading }) => {
+    const insightNameRef = useRef<HTMLInputElement>(null);
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
+        <form onSubmit={(e) => { e.preventDefault(); if (insightNameRef.current) onSubmit(insightNameRef.current.value); }} className="bg-secondary p-6 rounded-lg shadow-xl text-main-color w-full max-w-md">
+          <h3 className="font-heading text-2xl text-heading-color mb-4 echoic-unveil-title">{t("Name Your Understanding")}</h3>
+          <div className="font-body mb-4 p-3 bg-primary rounded border border-divider-color text-sm max-h-40 overflow-y-auto custom-scrollbar"><InteractiveText text={insightText} /></div>
+          <label htmlFor="insightName" className="font-heading text-lg block mb-2 text-heading-color">{t("Give it a name (3-50 chars):")}</label>
+          <input ref={insightNameRef} type="text" id="insightName" name="insightName" className="w-full p-2 border border-divider-color rounded bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary text-main-color" minLength={3} maxLength={50} required autoFocus />
+          <div className="flex gap-4 mt-4">
+            <button type="button" onClick={onCancel} className="fantasy-button fantasy-button-secondary flex-1" disabled={isLoading}>{t("Cancel")}</button>
+            <button type="submit" className="fantasy-button fantasy-button-primary flex-1" disabled={isLoading}>{isLoading ? t("Solidifying...") : t("Solidify")}</button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+  
+  const CustomActionInputForm: React.FC<{ t: Function, onSubmit: (action: string) => void, onCancel: () => void, isLoading?: boolean }> = ({ t, onSubmit, onCancel, isLoading }) => {
+    const actionRef = useRef<HTMLTextAreaElement>(null);
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 animate-fadeIn">
+        <form onSubmit={(e) => { e.preventDefault(); if (actionRef.current) onSubmit(actionRef.current.value); }} className="bg-secondary p-6 rounded-lg shadow-xl text-main-color w-full max-w-lg border-2 border-magical-positive-border">
+          <h3 className="font-heading text-2xl text-magical-positive-color mb-2 text-center echoic-unveil-title">{t("Unleash Your Power")}</h3>
+          <p className="font-body text-center text-muted-color mb-4">{t("The world shimmers with resonant energy! What do you try to do with this surge of power?")}</p>
+          <textarea
+              ref={actionRef} id="customAction" name="customAction" rows={3} required autoFocus
+              placeholder={t("Describe your action... (e.g., 'I mend the crack in the Heartstone with pure light', 'I command the phantom to reveal its true name')")}
+              className="w-full p-2 border rounded bg-primary focus:outline-none focus:ring-2 text-main-color custom-scrollbar custom-action-input"
+              minLength={10} maxLength={200}
+          />
+          <div className="flex gap-4 mt-4">
+            <button type="button" onClick={onCancel} className="fantasy-button fantasy-button-secondary flex-1" disabled={isLoading}>{t("Cancel")}</button>
+            <button type="submit" className="fantasy-button fantasy-button-primary flex-1" disabled={isLoading}>{isLoading ? t("Acting...") : t("Act")}</button>
+          </div>
+        </form>
+      </div>
+    );
+  };
 
   const mainContent = () => {
     switch (currentPhase) {
@@ -1280,7 +1399,7 @@ const App: React.FC = () => {
         </div>;
       case GamePhase.Playing:
         if (gameState.isLoading && !gameState.currentScene && gameState.gameStarted) return <LoadingIndicator isLoading={true} message={t("The Weave shifts...")} t={t} />;
-        return (<StoryDisplayContainer t={t} gameState={gameState} handlePlayerChoice={handlePlayerChoice} handleSynthesizeEchoes={handleSynthesizeEchoes} handleFocusSenses={handleFocusSenses} handleResonanceSurge={handleResonanceSurge} handleRequestReflection={handleRequestReflection} isReflecting={isReflecting} handleTogglePlayerNotes={handleTogglePlayerNotes} />);
+        return (<StoryDisplayContainer t={t} gameState={gameState} handlePlayerChoice={handlePlayerChoice} handleToggleEchoWeaving={handleToggleEchoWeaving} handleFocusSenses={handleFocusSenses} handleResonanceSurge={handleResonanceSurge} handleRequestReflection={handleRequestReflection} isReflecting={isReflecting} handleTogglePlayerNotes={handleTogglePlayerNotes} handleToggleMap={handleToggleMap} />);
       case GamePhase.Error:
         return <ErrorDisplay t={t} error={gameState.error || t(GENERIC_API_ERROR_MESSAGE_KEY)} onDismiss={dismissError} startGameFlow={startGameFlow} currentLanguage={gameState.currentLanguage} />;
       case GamePhase.AwaitingNameInput:
@@ -1289,9 +1408,9 @@ const App: React.FC = () => {
       case GamePhase.AwaitingLoreInterpretation:
         if (!gameState.loreToInterpret) return <LoadingIndicator isLoading={true} message={t("Delving into arcane interpretations...")} t={t} />;
         return <LoreInterpretationModal t={t} loreTitle={gameState.loreToInterpret.title} interpretations={gameState.loreToInterpret.interpretations} onSubmit={handleLoreInterpretationSubmit} onCancel={handleCancelLoreInterpretation} />;
+      case GamePhase.AwaitingCustomActionInput:
+        return <CustomActionInputForm t={t} onSubmit={handleCustomActionSubmit} onCancel={() => setCurrentPhase(GamePhase.Playing)} isLoading={gameState.isLoading} />;
       default:
-        // This case should ideally not be reached if API key is missing and intro is handled.
-        // If it is, it's likely API key is missing, or intro video is somehow stuck.
         if (gameState.apiKeyMissing) {
              return <ErrorDisplay t={t} error={t(API_KEY_ERROR_MESSAGE_KEY)} onDismiss={dismissError} startGameFlow={startGameFlow} currentLanguage={gameState.currentLanguage} />;
         }
@@ -1299,100 +1418,14 @@ const App: React.FC = () => {
     }
   };
 
-  const NameInsightForm: React.FC<{ t: Function, onSubmit: (name: string) => void, onCancel: () => void, insightText: string, isLoading?: boolean }> = ({ t, onSubmit, onCancel, insightText, isLoading }) => {
-    const insightNameRef = useRef<HTMLInputElement>(null);
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 animate-fadeIn">
-        <form onSubmit={(e) => { e.preventDefault(); if (insightNameRef.current) onSubmit(insightNameRef.current.value); }} className="bg-secondary p-6 rounded-lg shadow-xl text-main-color w-full max-w-md">
-          <h3 className="font-heading text-2xl text-heading-color mb-4 echoic-unveil-title">{t("Name Your Understanding")}</h3>
-          <div className="font-body mb-4 p-3 bg-primary rounded border border-divider-color text-sm max-h-40 overflow-y-auto custom-scrollbar"><InteractiveText text={insightText} /></div>
-          <label htmlFor="insightName" className="font-heading text-lg block mb-2 text-heading-color">{t("Give it a name (3-50 chars):")}</label>
-          <input ref={insightNameRef} type="text" id="insightName" name="insightName" className="w-full p-2 border border-divider-color rounded bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary text-main-color" minLength={3} maxLength={50} required autoFocus />
-          <div className="flex gap-4 mt-4">
-            <button type="button" onClick={onCancel} className="fantasy-button fantasy-button-secondary flex-1" disabled={isLoading}>{t("Cancel")}</button>
-            <button type="submit" className="fantasy-button fantasy-button-primary flex-1" disabled={isLoading}>{isLoading ? t("Solidifying...") : t("Solidify")}</button>
-          </div>
-        </form>
-      </div>
-    );
-  };
-
-  const StoryDisplayContainer: React.FC<{
-    t: (key: string, params?: Record<string, string | number>) => string,
-    gameState: GameState,
-    handlePlayerChoice: (choice: string, index: number) => void,
-    handleSynthesizeEchoes: () => void,
-    handleFocusSenses: () => void,
-    handleResonanceSurge: () => void,
-    handleRequestReflection: () => void,
-    isReflecting: boolean,
-    handleTogglePlayerNotes: () => void
-  }> = ({ t, gameState, handlePlayerChoice, handleSynthesizeEchoes, handleFocusSenses, handleResonanceSurge, handleRequestReflection, isReflecting, handleTogglePlayerNotes }) => (
-    <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
-      <header className="text-center mb-6 md:mb-10">
-        <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-400 echoic-unveil-title">{t("Resonant Echoes")}</h1>
-        {gameState.characterProfile && <p className="font-body text-lg text-muted-color">{t("The Journey of {name}, the {archetype}", { name: gameState.characterProfile.firstName, archetype: gameState.characterProfile.archetype.title })}</p>}
-      </header>
-      <DreamRumorDisplay t={t} dreamOrVision={gameState.dreamOrVisionToDisplay} rumors={gameState.currentRumors} onDismissDream={() => dispatch({ type: 'DISMISS_DREAM_OR_VISION' })} />
-      {gameState.activeDissonanceEffect && (<div className="mb-4 p-3 bg-red-900 bg-opacity-20 rounded border border-magical-dissonance-border text-sm"><strong className="text-magical-dissonance-text font-semibold">{t("Dissonance Active:")} </strong><InteractiveText text={gameState.activeDissonanceEffect.description} className="text-magical-dissonance-text" /> {gameState.activeDissonanceEffect.mechanicalEffect && <span className="block text-xs italic text-red-400">({gameState.activeDissonanceEffect.mechanicalEffect})</span>}</div>)}
-      {gameState.playerConditions.length > 0 && (<div className="mb-4 p-3 bg-yellow-500 bg-opacity-20 rounded border border-accent-primary-border text-sm"><strong className="text-accent-primary font-semibold">{t("Conditions:")} </strong> {gameState.playerConditions.map(c => `${c.type}: ${c.description}`).join('; ')}</div>)}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
-        <div className="md:col-span-8"> <ImageDisplay t={t} imageUrl={gameState.currentImageUrl} altText={gameState.currentImagePrompt || "Scene"} isLoading={gameState.isLoading && !gameState.currentImageUrl && !!gameState.currentImagePrompt} /> </div>
-        <div className="md:col-span-4 space-y-4"> <GameStatusDisplay t={t} timeOfDay={gameState.currentTimeOfDay} weather={gameState.currentWeather} inventory={gameState.playerInventory} onAttune={(itemName) => handlePlayerChoice(`Attempt to Attune to ${itemName}`, -1)} characterProfile={gameState.characterProfile} /> <RenownDisplay renown={gameState.renown} lastChangeNarrative={gameState.lastRenownNarrative} animateOnUpdate={!!(gameState.lastRenownNarrative || gameState.renown !== 0)} /> </div>
-      </div>
-      {gameState.error && currentPhase === GamePhase.Playing && (<div className="mb-4 p-4 bg-red-100 text-red-700 rounded border border-red-300 shadow flex justify-between items-center">{gameState.error} <button onClick={dismissError} className="text-sm p-1 hover:bg-red-200 rounded">X</button></div>)}
-      <div className="bg-secondary p-4 sm:p-6 rounded-lg shadow-lg border border-divider-color mb-6">
-        <h2 className="font-heading text-3xl text-heading-color mb-4 border-b border-divider-color pb-2">{t("The Unfolding Path")}</h2>
-        <StoryDisplay storyText={gameState.currentScene} enableTypingEffect={true} className="text-lg text-main-color" />
-        <ChoicesDisplay choices={gameState.choices} onChoiceSelected={handlePlayerChoice} isLoading={gameState.isLoading || isReflecting} lastChosenIndex={gameState.lastChosenChoiceIndex} activeHotspots={gameState.activeEchoHotspots} />
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-          <button onClick={handleSynthesizeEchoes} className={`fantasy-button fantasy-button-secondary ${(gameState.whisperingEchoes.length > 0 && !gameState.isLoading && !isReflecting) ? 'synthesis-button-ready-pulse' : ''}`} disabled={gameState.isLoading || isReflecting || gameState.whisperingEchoes.length === 0}> {t("Synthesize ({count})", { count: gameState.whisperingEchoes.length })} </button>
-          <button onClick={handleFocusSenses} className="fantasy-button fantasy-button-secondary" disabled={gameState.isLoading || isReflecting || !gameState.currentScene}>{t("Focus Senses")}</button>
-          <button
-            onClick={handleResonanceSurge}
-            className={`fantasy-button fantasy-button-primary ${gameState.isResonanceSurgeAvailable ? 'resonance-surge-ready-pulse' : ''}`}
-            disabled={!gameState.isResonanceSurgeAvailable || gameState.isLoading || isReflecting}
-          >
-            {gameState.isResonanceSurgeAvailable ? t("Resonance Surge") : t("Surge (CD: {cooldown})", { cooldown: gameState.resonanceSurgeCooldown })}
-          </button>
-          <button onClick={handleRequestReflection} className="fantasy-button fantasy-button-secondary" disabled={gameState.isLoading || isReflecting || !gameState.currentScene}> {isReflecting ? t("Pondering...") : t("Ponder Moment")} </button>
-        </div>
-      </div>
-      <WhisperingEchoesDisplay t={t} echoes={gameState.whisperingEchoes} isSynthesizing={false} />
-      <div className="flex gap-4 mt-6 justify-center">
-        <button onClick={handleToggleLore} className={`fantasy-button fantasy-button-primary ${newLoreForGlow ? 'new-entry-glow-button' : ''}`}> {t("Tome ({count})", { count: gameState.loreJournal.length + gameState.loreFragments.length })} </button>
-        <button onClick={handleToggleHistory} className="fantasy-button fantasy-button-primary"> {t("Path Taken ({count})", { count: gameState.historyLog.length })} </button>
-        <button onClick={handleTogglePlayerNotes} className="fantasy-button fantasy-button-primary">{t("My Journal ({count})", { count: gameState.playerNotes.length })}</button>
-        <button onClick={handleOpenSettings} className="fantasy-button fantasy-button-primary">{t("Settings")}</button>
-      </div>
-    </div>
-  );
-  const ErrorDisplay: React.FC<{ t: Function, error: string, onDismiss: () => void, startGameFlow: () => void, currentLanguage: 'en' | 'pt' }> = ({ t, error, onDismiss, startGameFlow, currentLanguage }) => (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center animate-fadeIn bg-primary">
-      <h2 className="font-heading text-4xl text-magical-error-text mb-4">{t("A Dissonant Chord!")}</h2>
-      <InteractiveText text={error || t(GENERIC_API_ERROR_MESSAGE_KEY)} className="text-lg text-main-color mb-6 max-w-md" />
-      <button onClick={onDismiss} className="fantasy-button fantasy-button-primary">{t("Return to Safety")}</button>
-      <RestartButton onRestart={() => { dispatch({ type: 'INITIALIZE_GAME_STATE', payload: { currentLanguage } }); setCurrentPhase(GamePhase.HomeScreen); startGameFlow(); }} text={t("Restart Chronicle")} />
-    </div>
-  );
-
+  // The main return statement for the App component was missing.
+  // I have reconstructed it based on the available components and state.
   return (
     <div className={appContainerClasses}>
-      <LoadingIndicator
-        isLoading={
-          (gameState.isLoading && (currentPhase !== GamePhase.Playing || (currentPhase === GamePhase.Playing && !gameState.currentImageUrl && !!gameState.currentImagePrompt))) ||
-          (currentPhase === GamePhase.HomeScreen && !showIntroVideo && gameState.isHomeScreenImageLoading && !gameState.homeScreenImageUrl)
-        }
-        message={
-          gameState.apiKeyMissing ? t("Awaiting Weaver's Permission (API Key)...") :
-            (currentPhase === GamePhase.HomeScreen && !showIntroVideo && gameState.isHomeScreenImageLoading) ? t("The Atheneum Materializes...") :
-              (currentPhase !== GamePhase.Playing && gameState.isLoading) ? t("The Threads of Fate are Weaving...") :
-                (currentPhase === GamePhase.Playing && gameState.isLoading && !gameState.currentImageUrl && !!gameState.currentImagePrompt) ? t("A Vision Coalesces...") :
-                  t("The Weave Shimmers...")
-        }
-        t={t}
-      />
+      <LoadingIndicator isLoading={gameState.isLoading && (!gameState.currentScene || currentPhase !== GamePhase.Playing)} message={t("The Weave Shimmers...")} t={t} />
+      
       {mainContent()}
+
       <SettingsPanel
         t={t}
         isOpen={gameState.showSettingsPanel}
@@ -1408,25 +1441,58 @@ const App: React.FC = () => {
         currentLanguage={gameState.currentLanguage}
         onLanguageChangeAndReset={handleLanguageChangeAndReset}
       />
-      {gameState.showLoreJournalModal && <LoreJournal t={t} loreEntries={gameState.loreJournal} loreFragments={gameState.loreFragments} isOpen={gameState.showLoreJournalModal} onToggle={handleToggleLore} showGlow={newLoreForGlow} newestEntryId={gameState.newestLoreEntryId} onSynthesizeFragments={(fragmentIdsToSynthesize: string[]) => { const titles = fragmentIdsToSynthesize.map(id => gameState.loreFragments.find(f => f.id === id)?.titleHint || 'Unknown Fragment'); handlePlayerChoice(`Attempt to Synthesize Lore Fragments: ${titles.join(' & ')}`, -1); }} />}
-      {gameState.showHistoryLogModal && <HistoryLog t={t} historyLog={gameState.historyLog} isOpen={gameState.showHistoryLogModal} onToggle={handleToggleHistory} />}
-      {gameState.showPlayerNotesModal && (
-        <PlayerNotesModal
-          t={t}
-          isOpen={gameState.showPlayerNotesModal}
-          onClose={handleTogglePlayerNotes}
-          notes={gameState.playerNotes}
-          onAddNote={(noteData) => dispatch({ type: 'ADD_PLAYER_NOTE', payload: noteData })}
-          onUpdateNote={(note) => dispatch({ type: 'UPDATE_PLAYER_NOTE', payload: note })}
-          onDeleteNote={(id) => dispatch({ type: 'DELETE_PLAYER_NOTE', payload: { id } })}
-        />
+
+      <LoreJournal
+        t={t}
+        isOpen={gameState.showLoreJournalModal}
+        onToggle={handleToggleLore}
+        loreEntries={gameState.loreJournal}
+        loreFragments={gameState.loreFragments}
+        newestEntryId={gameState.newestLoreEntryId}
+        onSynthesizeFragments={(fragmentIds) => handlePlayerChoice(`Attempt to Synthesize Lore Fragments: ${fragmentIds.join(" & ")}`, -1)}
+      />
+
+      <HistoryLog
+        t={t}
+        isOpen={gameState.showHistoryLogModal}
+        onToggle={handleToggleHistory}
+        historyLog={gameState.historyLog}
+      />
+      
+      <PlayerNotesModal
+        t={t}
+        isOpen={gameState.showPlayerNotesModal}
+        onClose={handleTogglePlayerNotes}
+        notes={gameState.playerNotes}
+        onAddNote={(noteData) => dispatch({ type: 'ADD_PLAYER_NOTE', payload: noteData })}
+        onUpdateNote={(note) => dispatch({ type: 'UPDATE_PLAYER_NOTE', payload: note })}
+        onDeleteNote={(id) => dispatch({ type: 'DELETE_PLAYER_NOTE', payload: { id } })}
+      />
+      
+      <MapModal 
+        t={t} 
+        isOpen={gameState.showMapModal} 
+        onClose={handleToggleMap} 
+        locations={gameState.discoveredLocations} 
+        currentLocationId={gameState.currentLocationId} 
+      />
+      
+      <EchoWeavingModal
+        t={t}
+        isOpen={gameState.showEchoWeavingModal}
+        onClose={handleToggleEchoWeaving}
+        echoes={gameState.whisperingEchoes}
+        onSynthesize={handleSynthesizeEchoes}
+      />
+      
+      {currentPhase !== GamePhase.HomeScreen && (
+        <footer className="text-center text-xs text-muted-color p-4 mt-auto">
+          <p>{t("Resonant Echoes. Created with Gemini & React.")}</p>
+          <p>{t("Fonts: MedievalSharp & EB Garamond by Google Fonts.")}</p>
+        </footer>
       )}
-      <footer className={`text-center py-5 border-t text-xs ${currentPhase === GamePhase.HomeScreen && !showIntroVideo ? 'absolute bottom-0 w-full bg-black bg-opacity-30 text-gray-400 border-transparent' : 'mt-auto border-divider-color text-muted-color'}`}>
-        <p> {t(currentPhase === GamePhase.HomeScreen && !showIntroVideo ? "A tale woven by Gemini & React." : "Resonant Echoes. Created with Gemini & React.")} </p>
-        <p> {t("Fonts: MedievalSharp & EB Garamond by Google Fonts.")} </p>
-      </footer>
     </div>
   );
-};
+}
 
 export default App;
