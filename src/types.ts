@@ -1,5 +1,3 @@
-
-
 // --- EXISTING TYPES ---
 
 export interface WhisperingEchoDetail {
@@ -417,11 +415,7 @@ export enum GamePhase {
   HomeScreen,
   IntroVideo,
   // Character Creation Phases
-  ArchetypeSelection,
-  OriginSelection,
-  BackgroundSelection,
-  NameInput,
-  ConfirmationAndTransition, // AI confirms profile & generates first story scene
+  CharacterCreation,
   // Main Gameplay
   Playing,
   Error,

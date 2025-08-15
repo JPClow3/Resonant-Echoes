@@ -5,14 +5,14 @@ import InteractiveText from './InteractiveText'; // Assuming InteractiveText is 
 
 interface StoryDisplayProps {
   storyText: string;
-  enableTypingEffect?: boolean;
+  isStreaming?: boolean;
   className?: string;
 }
 
-const StoryDisplay: React.FC<StoryDisplayProps> = ({ storyText, enableTypingEffect = false, className = "" }) => {
+const StoryDisplay: React.FC<StoryDisplayProps> = ({ storyText, isStreaming = false, className = "" }) => {
   return (
     <div className={`animate-fadeInUp-story illuminated-first-letter ${className}`}>
-      <InteractiveText text={storyText} enableTypingEffect={enableTypingEffect} />
+      <InteractiveText text={storyText} isStreaming={isStreaming} />
     </div>
   );
 };

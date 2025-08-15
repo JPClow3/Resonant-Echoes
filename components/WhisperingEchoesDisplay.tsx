@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { WhisperingEchoDetail } from '../types'; // Adjust path as necessary
 import InteractiveText from './InteractiveText';
@@ -11,15 +10,34 @@ interface WhisperingEchoesDisplayProps {
 }
 
 const WhisperingEchoesDisplay: React.FC<WhisperingEchoesDisplayProps> = ({ t, echoes, isSynthesizing, clearSignal }) => {
-  const getIntensityClass = (intensityHint?: WhisperingEchoDetail['intensityHint']) => {
-    switch (intensityHint) {
-      case 'Faint': return 'echo-intensity-faint';
-      case 'Clear': return 'echo-intensity-clear';
-      case 'Strong': return 'echo-intensity-strong';
-      case 'Overwhelming': return 'echo-intensity-overwhelming';
-      case 'Chaotic': return 'echo-intensity-chaotic';
-      default: return 'echo-intensity-moderate';
+  const getEchoContainerClasses = (echo: WhisperingEchoDetail) => {
+    const classes = [];
+    if (echo.isFalse) {
+      classes.push('echo-false');
+      classes.push('echo-glitch'); // False echoes are deceptive and should glitch
+      return classes.join(' ');
     }
+    
+    switch (echo.intensityHint) {
+      case 'Faint': classes.push('echo-intensity-faint'); break;
+      case 'Clear': classes.push('echo-intensity-clear'); break;
+      case 'Strong': classes.push('echo-intensity-strong'); break;
+      case 'Overwhelming': classes.push('echo-intensity-overwhelming'); break;
+      case 'Chaotic': classes.push('echo-intensity-chaotic'); break;
+      default: classes.push('echo-intensity-moderate'); break;
+    }
+    
+    switch (echo.corruptionLevel) {
+        case 'Minor': classes.push('echo-corrupted-minor'); break;
+        case 'Moderate': classes.push('echo-corrupted-moderate'); break;
+        case 'Severe': classes.push('echo-corrupted-severe'); classes.push('echo-glitch'); break; // Severe corruption also glitches
+    }
+
+    if (echo.dissonanceFlavor) {
+      classes.push('echo-glitch');
+    }
+
+    return classes.join(' ');
   };
 
   if (!echoes || echoes.length === 0) {
@@ -38,11 +56,13 @@ const WhisperingEchoesDisplay: React.FC<WhisperingEchoesDisplayProps> = ({ t, ec
         {echoes.map((echo, index) => (
           <li 
             key={echo.id || index} 
-            className={`bg-primary p-3 rounded shadow border-l-4 text-sm animate-fadeInUp-story whispering-echo-item ${getIntensityClass(echo.intensityHint)}`}
+            className={`bg-primary p-3 rounded shadow border-l-4 text-sm animate-fadeInUp-story whispering-echo-item ${getEchoContainerClasses(echo)}`}
             style={{ animationDelay: `${index * 0.1}s` }}
           >
             <p className="font-body italic text-main-color mb-1">
-              <strong>{t("Intensity:")}</strong> {echo.intensityHint}, <strong>{t("Type:")}</strong> {echo.typeHint}
+              <strong>{t("Intensity:")}</strong> {echo.intensityHint}
+              {echo.corruptionLevel && <span className="text-magical-dissonance-color"> ({echo.corruptionLevel} Corruption)</span>}
+              , <strong>{t("Type:")}</strong> {echo.typeHint}
             </p>
             <InteractiveText text={echo.text} className="text-main-color" />
             {echo.originHint && <p className="text-xs text-muted-color mt-1"><em>{t("Origin:")}</em> {echo.originHint}</p>}

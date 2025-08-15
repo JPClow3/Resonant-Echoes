@@ -1,8 +1,6 @@
 
-
-
 import React, { useState, useEffect } from 'react';
-import { EchoHotspot } from '../types'; // Adjust path if necessary
+import { EchoHotspot } from '../types'; 
 
 interface ChoicesDisplayProps {
   choices: string[];

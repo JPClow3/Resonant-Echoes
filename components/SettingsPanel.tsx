@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 
 interface SettingsPanelProps {
@@ -14,7 +15,7 @@ interface SettingsPanelProps {
   isColorBlindAssistActive: boolean;
   onToggleColorBlindAssist: () => void;
   currentLanguage: 'en' | 'pt';
-  onLanguageChangeAndReset: (lang: 'en' | 'pt') => void;
+  onLanguageChange: (lang: 'en' | 'pt') => void;
 }
 
 const soundService = {
@@ -36,7 +37,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isColorBlindAssistActive,
   onToggleColorBlindAssist,
   currentLanguage,
-  onLanguageChangeAndReset,
+  onLanguageChange,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +61,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleLanguageButtonClick = (lang: 'en' | 'pt') => {
     if (lang !== currentLanguage) {
         soundService.playSound('LANGUAGE_CHANGE');
-        onLanguageChangeAndReset(lang);
+        onLanguageChange(lang);
     }
     onClose(); 
   };
@@ -153,7 +154,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="mb-6">
           <h3 className="font-heading text-xl text-accent-primary mb-2">{t("Appearance")}</h3>
           <div className="flex items-center justify-between p-3 bg-primary rounded-md border border-divider-color mb-3">
-            <span className="font-body">{currentTheme === 'light' ? t("Current Theme: Ancient Parchment") : t("Current Theme: Moonlit Archives")}</span>
+            <span className="font-body">{currentTheme === 'light' ? t("Current Theme: Crystalline Veil") : t("Current Theme: Astral Weave")}</span>
             <button
               onClick={() => { onToggleTheme(); soundService.playSound('THEME_TOGGLE');}}
               className="theme-toggle-medallion p-2 rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary"

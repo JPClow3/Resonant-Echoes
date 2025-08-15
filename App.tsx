@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useReducer } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
@@ -7,27 +8,25 @@ import {
   GeminiResponseData, GameState, GameContextForAI, GamePhase,
   PlayerInventoryItem, DissonanceEffect, PlayerTemporaryCondition,
   ArchetypeProfile, OriginProfile, BackgroundProfile, CharacterProfile, PlayerNote,
-  EchoHotspot, LocationData
+  EchoHotspot, LocationData, DissonantAberration, ActiveModal, MindMapLayout
 } from './types';
 
 import {
   GEMINI_NARRATIVE_MODEL, IMAGEN_IMAGE_MODEL, VEO_VIDEO_MODEL, PLACEHOLDER_IMAGE_URL,
   PLACEHOLDER_HOME_SCREEN_IMAGE_URL, CORE_SYSTEM_INSTRUCTION,
-  CONTINUE_GAME_PROMPT_TEMPLATE, SYNTHESIZE_ECHOES_PROMPT_TEMPLATE,
-  SYNTHESIZE_LORE_FRAGMENTS_PROMPT_TEMPLATE, ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE,
-  REQUEST_PLAYER_REFLECTION_PROMPT_TEMPLATE, API_KEY_ERROR_MESSAGE_KEY,
-  GENERIC_API_ERROR_MESSAGE_KEY,
+  API_KEY_ERROR_MESSAGE_KEY, GENERIC_API_ERROR_MESSAGE_KEY, NETWORK_ERROR_MESSAGE_KEY,
   HOME_SCREEN_IMAGE_PROMPT, INTRO_VIDEO_PROMPT,
   ARCHETYPES_DATA, ORIGINS_DATA, BACKGROUNDS_DATA,
-  CHARACTER_CREATION_INTRO_PROMPT, ARCHETYPE_SELECTED_PROMPT_TEMPLATE,
-  ORIGIN_SELECTED_PROMPT_TEMPLATE, BACKGROUND_SELECTED_PROMPT_TEMPLATE,
-  NAME_SUBMITTED_PROMPT_TEMPLATE, INITIAL_GAME_PROMPT, FOCUS_SENSES_PROMPT_TEMPLATE,
-  CUSTOM_ACTION_PROMPT_TEMPLATE
+  buildCharacterCreationIntroPrompt, buildArchetypeSelectedPrompt,
+  buildOriginSelectedPrompt, buildBackgroundSelectedPrompt,
+  buildNameSubmittedPrompt, buildContinueGamePrompt,
+  buildSynthesizeEchoesPrompt, buildSynthesizeLoreFragmentsPrompt,
+  buildAttuneToArtifactPrompt, buildRequestPlayerReflectionPrompt,
+  buildFocusSensesPrompt, buildCustomActionPrompt, buildSummarizeHistoryPrompt
 } from './constants';
 import { AudioService } from './services/audioService';
 
 import LoadingIndicator from './components/LoadingIndicator';
-import InteractiveText from './components/InteractiveText';
 import StoryDisplay from './components/StoryDisplay';
 import ImageDisplay from './components/ImageDisplay';
 import ChoicesDisplay from './components/ChoicesDisplay';
@@ -35,7 +34,6 @@ import RenownDisplay from './components/RenownDisplay';
 import WhisperingEchoesDisplay from './components/WhisperingEchoesDisplay';
 import LoreJournal from './components/LoreJournal';
 import HistoryLog from './components/HistoryLog';
-import RestartButton from './components/RestartButton';
 import GameStatusDisplay from './components/GameStatusDisplay';
 import HomeScreen from './components/HomeScreen';
 import SettingsPanel from './components/SettingsPanel';
@@ -54,6 +52,7 @@ const translations = {
   "Resonant Echoes": { en: "Resonant Echoes", pt: "Ecos Ressonantes" },
   "Settings": { en: "Settings", pt: "Opções" },
   "Cancel": { en: "Cancel", pt: "Cancelar" },
+  "Summarizing the chronicle...": { en: "Summarizing the chronicle...", pt: "Resumindo a crônica..." },
 
 
   // HomeScreen
@@ -64,6 +63,7 @@ const translations = {
 
   // App.tsx specific UI elements in StoryDisplayContainer
   "The Journey of {name}, the {archetype}": { en: "The Journey of {name}, the {archetype}", pt: "A Jornada de {name}, o/a {archetype}" },
+  "Forge Your Resonance": { en: "Forge Your Resonance", pt: "Forje Sua Ressonância"},
   "Dissonance Active:": { en: "Dissonance Active:", pt: "Dissonância Ativa:" },
   "Conditions:": { en: "Conditions:", pt: "Condições:" },
   "The Unfolding Path": { en: "The Unfolding Path", pt: "O Caminho Que Se Desdobra" },
@@ -111,8 +111,8 @@ const translations = {
   "English": { en: "English", pt: "Inglês" },
   "Português": { en: "Português", pt: "Português" },
   "Appearance": { en: "Appearance", pt: "Aparência" },
-  "Current Theme: Ancient Parchment": { en: "Current Theme: Ancient Parchment", pt: "Tema Atual: Pergaminho Antigo" },
-  "Current Theme: Moonlit Archives": { en: "Current Theme: Moonlit Archives", pt: "Tema Atual: Arquivos Enluarados" },
+  "Current Theme: Crystalline Veil": { en: "Current Theme: Crystalline Veil", pt: "Tema Atual: Véu Cristalino" },
+  "Current Theme: Astral Weave": { en: "Current Theme: Astral Weave", pt: "Tema Atual: Trama Astral" },
   "Switch to {theme} mode": { en: "Switch to {theme} mode", pt: "Mudar para modo {theme}" },
   "dark": { en: "dark", pt: "escuro" },
   "light": { en: "light", pt: "claro" },
@@ -169,6 +169,7 @@ const translations = {
   "Inventory:": { en: "Inventory:", pt: "Inventário:" },
   "Attune to Echoes": { en: "Attune to Echoes", pt: "Sintonizar com Ecos" },
   "The Weave is calm, your satchel light.": { en: "The Weave is calm, your satchel light.", pt: "A Trama está calma, sua bolsa está leve." },
+  "Threats": { en: "Threats", pt: "Ameaças" },
 
   // WhisperingEchoesDisplay
   "Whispering Echoes": { en: "Whispering Echoes", pt: "Ecos Sussurrantes" },
@@ -186,6 +187,7 @@ const translations = {
 
   // PlayerNotesModal
   "My Personal Journal": { en: "My Personal Journal", pt: "Meu Diário Pessoal" },
+  "The Weaver's Journal & Mind Map": { en: "The Weaver's Journal & Mind Map", pt: "O Diário do Tecelão e Mapa Mental" },
   "Close Journal": { en: "Close Journal", pt: "Fechar Diário" },
   "Edit Entry": { en: "Edit Entry", pt: "Editar Entrada" },
   "New Entry": { en: "New Entry", pt: "Nova Entrada" },
@@ -195,7 +197,7 @@ const translations = {
   "Record your thoughts, theories, or reminders here...": { en: "Record your thoughts, theories, or reminders here...", pt: "Anote seus pensamentos, teorias ou lembretes aqui..." },
   "Note content cannot be empty.": { en: "Note content cannot be empty.", pt: "O conteúdo da nota não pode estar vazio." },
   "Tags (comma-separated):": { en: "Tags (comma-separated):", pt: "Etiquetas (separadas por vírgula):" },
-  "E.g., #Theron, #ArchitectMystery, #Heartstone": { en: "E.g., #Theron, #ArchitectMystery, #Heartstone", pt: "Ex: #Theron, #MisterioDosArquitetos, #PedraCerne" },
+  "E.g., #Theron, #ArchitectMystery, #Heartstone": { en: "E.g., #Theron, #MisterioDosArquitetos, #PedraCerne" },
   "Linked Lore IDs (comma-separated):": { en: "Linked Lore IDs (comma-separated):", pt: "IDs de Sabedoria Vinculados (separados por vírgula):" },
   "E.g., lore_ancient_ritual, lore_theron_warning_1": { en: "E.g., lore_ancient_ritual, lore_theron_warning_1", pt: "Ex: sabedoria_ritual_antigo, sabedoria_aviso_theron_1" },
   "Save Changes": { en: "Save Changes", pt: "Salvar Alterações" },
@@ -209,6 +211,8 @@ const translations = {
   "Confirm Deletion": { en: "Confirm Deletion", pt: "Confirmar Exclusão" },
   "Are you sure you want to delete this journal entry? This action cannot be undone.": { en: "Are you sure you want to delete this journal entry? This action cannot be undone.", pt: "Tem certeza de que deseja excluir esta entrada do diário? Esta ação não pode ser desfeita." },
   "Delete Entry": { en: "Delete Entry", pt: "Excluir Entrada" },
+  "All Notes": { en: "All Notes", pt: "Todas as Notas" },
+  "All Lore": { en: "All Lore", pt: "Toda a Sabedoria" },
 
   // MapModal
   "Chronicle Map": { en: "Chronicle Map", pt: "Mapa da Crônica" },
@@ -233,7 +237,9 @@ const translations = {
   
   // API KEY Error
   [API_KEY_ERROR_MESSAGE_KEY]: { en: 'API Key is missing. Please ensure it is configured correctly to begin your journey.', pt: 'A Chave de API está faltando. Por favor, garanta que ela esteja configurada corretamente para começar sua jornada.' },
-  [GENERIC_API_ERROR_MESSAGE_KEY]: { en: 'A dissonant hum from the Weave prevents a clear connection. Please check your connection or try again shortly.', pt: 'Um zumbido dissonante da Trama impede uma conexão clara. Por favor, verifique sua conexão ou tente novamente em breve.' },
+  [GENERIC_API_ERROR_MESSAGE_KEY]: { en: 'A dissonant hum from the Weave prevents a clear connection. Please try again shortly.', pt: 'Um zumbido dissonante da Trama impede uma conexão clara. Por favor, tente novamente em breve.' },
+  [NETWORK_ERROR_MESSAGE_KEY]: { en: 'The connection to the Weave was lost. Please check your network connection and try again.', pt: 'A conexão com a Trama foi perdida. Por favor, verifique sua conexão de rede e tente novamente.' },
+
 
   // LoadingIndicator
   "The Weave Shimmers...": { en: "The Weave Shimmers...", pt: "A Trama Cintila..." },
@@ -250,10 +256,12 @@ const translations = {
   "Whispers in the Weave:": { en: "Whispers in the Weave:", pt: "Sussurros na Trama:" },
 };
 
+const HISTORY_LOG_CAP = 50;
 
 type Action =
   | { type: 'START_GAME' }
-  | { type: 'API_CALL_START' }
+  | { type: 'API_CALL_START', payload?: { message?: string } }
+  | { type: 'STREAMING_TEXT_UPDATE', payload: string }
   | { type: 'API_CALL_SUCCESS'; payload: GeminiResponseData }
   | { type: 'API_CALL_FAILURE'; payload: string }
   | { type: 'SET_IMAGE_URL'; payload: string }
@@ -267,12 +275,10 @@ type Action =
   | { type: 'START_GAMEPLAY_TRANSITION' }
   | { type: 'SET_HOME_SCREEN_IMAGE_LOADING', payload: boolean }
   | { type: 'SET_HOME_SCREEN_IMAGE_URL', payload: { url: string | null, error?: string } }
-  | { type: 'TOGGLE_SETTINGS_PANEL' }
   | { type: 'UPDATE_VOLUME', payload: number }
   | { type: 'TOGGLE_MUTE' }
   | { type: 'TOGGLE_COLOR_BLIND_ASSIST' }
-  | { type: 'LORE_JOURNAL_TOGGLE' }
-  | { type: 'HISTORY_LOG_TOGGLE' }
+  | { type: 'SET_ACTIVE_MODAL', payload: ActiveModal }
   | { type: 'ADD_HISTORY_ENTRY', payload: HistoryEntry }
   | { type: 'SET_LAST_CHOICE', payload: number }
   | { type: 'ADD_PLAYER_REFLECTION', payload: string }
@@ -280,21 +286,22 @@ type Action =
   | { type: 'SUBMIT_LORE_INTERPRETATION', payload: string }
   | { type: 'CANCEL_LORE_INTERPRETATION' }
   | { type: 'CLEAR_INSIGHT_TO_NAME' }
-  | { type: 'PLAYER_NOTES_TOGGLE' }
-  | { type: 'ADD_PLAYER_NOTE', payload: { title: string, content: string, tags?: string[], linkedLoreIds?: string[] } }
+  | { type: 'ADD_PLAYER_NOTE', payload: { title: string, content: string } }
   | { type: 'UPDATE_PLAYER_NOTE', payload: PlayerNote }
   | { type: 'DELETE_PLAYER_NOTE', payload: string }
+  | { type: 'UPDATE_MIND_MAP_LAYOUT', payload: MindMapLayout }
   | { type: 'RESONANCE_SURGE_TOGGLE' }
-  | { type: 'MAP_TOGGLE' }
-  | { type: 'ECHO_WEAVING_TOGGLE' }
   | { type: 'SET_LANGUAGE', payload: 'en' | 'pt' }
   | { type: 'INTRO_VIDEO_START', payload: { message: string } }
   | { type: 'INTRO_VIDEO_LOADING_UPDATE', payload: { message: string } }
   | { type: 'INTRO_VIDEO_SUCCESS', payload: { url: string } }
-  | { type: 'INTRO_VIDEO_FAILURE', payload: { error: string } };
+  | { type: 'INTRO_VIDEO_FAILURE', payload: { error: string } }
+  | { type: 'SUMMARIZE_HISTORY_SUCCESS', payload: string };
 
 const initialState: GameState = {
   currentScene: '',
+  streamingSceneText: null,
+  storySummary: null,
   currentImagePrompt: null,
   currentImageUrl: null,
   choices: [],
@@ -320,7 +327,6 @@ const initialState: GameState = {
   homeScreenImageUrl: null,
   isHomeScreenImageLoading: false,
   homeScreenImageFetchAttempted: false,
-  showSettingsPanel: false,
   newestLoreEntryId: null,
   currentVolume: 70,
   isMuted: false,
@@ -332,15 +338,13 @@ const initialState: GameState = {
   awaitingLoreInterpretation: false,
   playerConditions: [],
   activeMemoryPhantoms: [],
+  activeDissonantAberrations: [],
   playerNotes: [],
-  showPlayerNotesModal: false,
+  mindMapLayout: { positions: {}, links: [] },
   isResonanceSurgeAvailable: true,
   resonanceSurgeCooldown: 0,
   currentLanguage: 'en',
-  showLoreJournalModal: false,
-  showHistoryLogModal: false,
-  showMapModal: false,
-  showEchoWeavingModal: false,
+  activeModal: null,
   discoveredLocations: [],
   currentLocationId: null,
   introVideoUrl: null,
@@ -350,192 +354,283 @@ const initialState: GameState = {
 };
 
 
-// Main Reducer
-const gameReducer = (state: GameState, action: Action): GameState => {
-  switch (action.type) {
-    case 'START_GAME':
-      return { ...state, isLoading: true, error: null, gameStarted: true, introVideoUrl: null, isIntroVideoLoading: true, introVideoLoadingMessage: '' };
-    case 'API_CALL_START':
-      return { ...state, isLoading: true, isTransitioning: true, error: null };
-    case 'API_CALL_SUCCESS':
-      const data = action.payload;
-      const newHistoryEntry: HistoryEntry = {
-        id: `hist_${new Date().toISOString()}`,
-        sceneSummary: data.scene.substring(0, 150) + (data.scene.length > 150 ? "..." : ""),
-        fullSceneText: data.scene,
-        choiceMade: state.historyLog.find(h => h.type === 'choice')?.choiceMade,
-        timestamp: new Date().toISOString(),
-        type: 'story'
-      };
+// --- REDUCER LOGIC SPLIT ---
 
-      const updatedFragments = data.loreFragments
-        ? state.loreFragments.filter(f => !data.loreFragments?.some(df => df.id === f.id)).concat(data.loreFragments)
-        : state.loreFragments;
-
-      const updatedInventory = { ...state.playerInventory };
-      if (data.newItemsGranted) {
-        Object.entries(data.newItemsGranted).forEach(([itemName, itemData]) => {
-          if (updatedInventory[itemName]) {
-            updatedInventory[itemName].count += itemData.count;
-          } else {
-            updatedInventory[itemName] = itemData;
-          }
-        });
-      }
-
-      const updatedConditions = data.playerConditionUpdate
-        ? [...state.playerConditions.filter(c => c.type !== data.playerConditionUpdate!.type), data.playerConditionUpdate]
-        : state.playerConditions;
-
-      return {
-        ...state,
-        isLoading: false,
-        isTransitioning: false,
-        currentScene: data.scene,
-        choices: data.choices || [],
-        currentImagePrompt: data.imagePrompt || state.currentImagePrompt,
-        whisperingEchoes: data.whisperingEchoes || [],
-        loreJournal: data.newLore ? [...state.loreJournal, ...data.newLore] : state.loreJournal,
-        newestLoreEntryId: data.newLore && data.newLore.length > 0 ? data.newLore[data.newLore.length - 1].id : null,
-        loreFragments: updatedFragments,
-        currentSoundscape: data.soundscape || state.currentSoundscape,
-        playerEchoicSignature: data.initialPlayerEchoicSignature || data.playerEchoicSignatureUpdate || state.playerEchoicSignature,
-        factionReputationNotes: data.factionUpdates ? { ...state.factionReputationNotes, ...data.factionUpdates } : state.factionReputationNotes,
-        renown: data.renownChangeAmount !== undefined ? state.renown + data.renownChangeAmount : state.renown,
-        lastRenownNarrative: data.renownChangeNarrative || state.lastRenownNarrative,
-        historyLog: [...state.historyLog, newHistoryEntry],
-        selectedArchetypeId: data.profileChoices?.origins ? state.selectedArchetypeId : null,
-        selectedOriginId: data.profileChoices?.backgrounds ? state.selectedOriginId : null,
-        insightToName: data.offerToNameInsight ? data.namedInsightContext || state.insightToName : null,
-        currentTimeOfDay: data.currentTimeOfDay || state.currentTimeOfDay,
-        currentWeather: data.currentWeather || state.currentWeather,
-        playerInventory: updatedInventory,
-        lastChosenChoiceIndex: null, // Reset after processing
-        currentRumors: data.rumorMillUpdate ? [...state.currentRumors, data.rumorMillUpdate] : state.currentRumors,
-        dreamOrVisionToDisplay: data.playerDreamOrVision || state.dreamOrVisionToDisplay,
-        awaitingLoreInterpretation: !!data.interpretiveChoicesForLore,
-        loreToInterpret: data.interpretiveChoicesForLore || state.loreToInterpret,
-        activeDissonanceEffect: data.dissonanceEffectInScene || null,
-        playerConditions: updatedConditions,
-        echoicBlightInScene: data.echoicBlightInScene || null,
-        activeMemoryPhantoms: data.memoryPhantomsInScene || [],
-        devouringSilenceZoneInScene: data.devouringSilenceZoneInScene || null,
-        characterProfile: data.confirmedProfileSummary && state.characterProfile ? { ...state.characterProfile } : state.characterProfile,
-        activeEchoHotspots: data.activeEchoHotspots || [],
-        resonanceSurgeCooldown: data.suggestedResonanceSurgeCooldown !== undefined ? data.suggestedResonanceSurgeCooldown : state.resonanceSurgeCooldown,
-        isResonanceSurgeAvailable: data.suggestedResonanceSurgeCooldown !== undefined ? false : state.isResonanceSurgeAvailable,
-        discoveredLocations: data.newLocationDiscovered ? [...state.discoveredLocations.filter(l => l.id !== data.newLocationDiscovered!.id), data.newLocationDiscovered] : state.discoveredLocations,
-        currentLocationId: data.newLocationDiscovered ? data.newLocationDiscovered.id : state.currentLocationId,
-      };
-    case 'API_CALL_FAILURE':
-      return { ...state, isLoading: false, isTransitioning: false, error: action.payload };
-    case 'SET_IMAGE_URL':
-      return { ...state, currentImageUrl: action.payload, isHomeScreenImageLoading: false };
-    case 'IMAGE_GENERATION_START':
-      return { ...state, isHomeScreenImageLoading: true };
-    case 'RESET_GAME':
-      return { ...initialState, apiKeyMissing: state.apiKeyMissing, homeScreenImageUrl: state.homeScreenImageUrl };
-
-    case 'INITIALIZE_GAME_STATE': {
-      return { ...action.payload, activeEchoHotspots: action.payload.activeEchoHotspots || [] };
+const characterReducer = (state: GameState, action: Action): GameState => {
+    switch (action.type) {
+        case 'CHOOSE_ARCHETYPE':
+            return { ...state, selectedArchetypeId: action.payload };
+        case 'CHOOSE_ORIGIN':
+            return { ...state, selectedOriginId: action.payload };
+        case 'CHOOSE_BACKGROUND':
+            return { ...state, selectedBackgroundId: action.payload };
+        case 'SUBMIT_NAME':
+            const archetype = ARCHETYPES_DATA.find(a => a.id === state.selectedArchetypeId)!;
+            const origin = ORIGINS_DATA.find(o => o.id === state.selectedOriginId)!;
+            const background = BACKGROUNDS_DATA.find(b => b.id === state.selectedBackgroundId)!;
+            const profile: CharacterProfile = { archetype, origin, background, firstName: action.payload };
+            return { ...state, firstName: action.payload, characterProfile: profile };
+        default:
+            return state;
     }
-    case 'CHOOSE_ARCHETYPE':
-      return { ...state, selectedArchetypeId: action.payload };
-    case 'CHOOSE_ORIGIN':
-      return { ...state, selectedOriginId: action.payload };
-    case 'CHOOSE_BACKGROUND':
-      return { ...state, selectedBackgroundId: action.payload };
-    case 'SUBMIT_NAME':
-      const archetype = ARCHETYPES_DATA.find(a => a.id === state.selectedArchetypeId)!;
-      const origin = ORIGINS_DATA.find(o => o.id === state.selectedOriginId)!;
-      const background = BACKGROUNDS_DATA.find(b => b.id === state.selectedBackgroundId)!;
-      const profile: CharacterProfile = { archetype, origin, background, firstName: action.payload };
-      return { ...state, firstName: action.payload, characterProfile: profile };
+};
 
-    case 'START_GAMEPLAY_TRANSITION':
-      return { ...state, gameStarted: true };
+const playerReducer = (state: GameState, action: Action): GameState => {
+    switch (action.type) {
+        case 'ADD_PLAYER_NOTE':
+            const newNote: PlayerNote = { id: `note_${new Date().toISOString()}_${Math.random()}`, timestamp: new Date().toISOString(), ...action.payload };
+            // Add new note to layout at a default position
+            const newPositions = { ...state.mindMapLayout.positions };
+            const noteNodeId = `note_${newNote.id}`;
+            const existingNodesCount = Object.keys(newPositions).length;
+            newPositions[noteNodeId] = { x: 50 + (existingNodesCount % 5) * 20, y: 50 + Math.floor(existingNodesCount / 5) * 120 };
+            
+            return { ...state, playerNotes: [...state.playerNotes, newNote], mindMapLayout: { ...state.mindMapLayout, positions: newPositions } };
+        case 'UPDATE_PLAYER_NOTE':
+            return { ...state, playerNotes: state.playerNotes.map(n => n.id === action.payload.id ? action.payload : n) };
+        case 'DELETE_PLAYER_NOTE':
+            const noteIdToDelete = `note_${action.payload}`;
+            const updatedPositions = { ...state.mindMapLayout.positions };
+            delete updatedPositions[noteIdToDelete];
+            const updatedLinks = state.mindMapLayout.links.filter(link => link.from !== noteIdToDelete && link.to !== noteIdToDelete);
+            return { 
+                ...state, 
+                playerNotes: state.playerNotes.filter(n => n.id !== action.payload),
+                mindMapLayout: { positions: updatedPositions, links: updatedLinks }
+            };
+        case 'UPDATE_MIND_MAP_LAYOUT':
+            return { ...state, mindMapLayout: action.payload };
+        default:
+            return state;
+    }
+};
 
-    case 'SET_HOME_SCREEN_IMAGE_LOADING':
-      return { ...state, isHomeScreenImageLoading: action.payload, homeScreenImageFetchAttempted: true };
-    case 'SET_HOME_SCREEN_IMAGE_URL':
-      return { ...state, homeScreenImageUrl: action.payload.url, isHomeScreenImageLoading: false, error: action.payload.error || null };
+const uiReducer = (state: GameState, action: Action): GameState => {
+    switch (action.type) {
+        case 'API_CALL_START':
+            return { ...state, isLoading: true, error: null, streamingSceneText: '', choices: [] };
+        case 'STREAMING_TEXT_UPDATE':
+            return { ...state, streamingSceneText: action.payload };
+        case 'API_CALL_FAILURE':
+            return { ...state, isLoading: false, isTransitioning: false, error: action.payload, streamingSceneText: null };
+        case 'SET_IMAGE_URL':
+            return { ...state, currentImageUrl: action.payload, isHomeScreenImageLoading: false };
+        case 'IMAGE_GENERATION_START':
+            return { ...state, isHomeScreenImageLoading: true };
+        case 'SET_HOME_SCREEN_IMAGE_LOADING':
+            return { ...state, isHomeScreenImageLoading: action.payload, homeScreenImageFetchAttempted: true };
+        case 'SET_HOME_SCREEN_IMAGE_URL':
+            return { ...state, homeScreenImageUrl: action.payload.url, isHomeScreenImageLoading: false, error: action.payload.error || null };
+        case 'UPDATE_VOLUME':
+            return { ...state, currentVolume: action.payload, isMuted: action.payload === 0 };
+        case 'TOGGLE_MUTE':
+            return { ...state, isMuted: !state.isMuted };
+        case 'TOGGLE_COLOR_BLIND_ASSIST':
+            return { ...state, isColorBlindAssistActive: !state.isColorBlindAssistActive };
+        case 'SET_ACTIVE_MODAL':
+            return { ...state, activeModal: action.payload, newestLoreEntryId: action.payload !== 'lore' ? state.newestLoreEntryId : null };
+        case 'SET_LAST_CHOICE':
+            return { ...state, lastChosenChoiceIndex: action.payload };
+        case 'DISMISS_DREAM_VISION':
+            return { ...state, dreamOrVisionToDisplay: null };
+        case 'INTRO_VIDEO_START':
+            return { ...state, isIntroVideoLoading: true, introVideoLoadingMessage: action.payload.message };
+        case 'INTRO_VIDEO_LOADING_UPDATE':
+            return { ...state, introVideoLoadingMessage: action.payload.message };
+        case 'INTRO_VIDEO_SUCCESS':
+            return { ...state, isIntroVideoLoading: false, introVideoUrl: action.payload.url };
+        case 'INTRO_VIDEO_FAILURE':
+            return { ...state, isIntroVideoLoading: false, introVideoUrl: null, gameStarted: true, error: null };
+        default:
+            return state;
+    }
+};
 
-    case 'TOGGLE_SETTINGS_PANEL':
-      return { ...state, showSettingsPanel: !state.showSettingsPanel };
-    case 'UPDATE_VOLUME':
-      return { ...state, currentVolume: action.payload, isMuted: action.payload === 0 };
-    case 'TOGGLE_MUTE':
-      return { ...state, isMuted: !state.isMuted };
-    case 'TOGGLE_COLOR_BLIND_ASSIST':
-      return { ...state, isColorBlindAssistActive: !state.isColorBlindAssistActive };
-    case 'LORE_JOURNAL_TOGGLE':
-      return { ...state, showLoreJournalModal: !state.showLoreJournalModal, newestLoreEntryId: null };
-    case 'HISTORY_LOG_TOGGLE':
-      return { ...state, showHistoryLogModal: !state.showHistoryLogModal };
-    case 'ADD_HISTORY_ENTRY':
-      return { ...state, historyLog: [...state.historyLog, action.payload] };
-    case 'SET_LAST_CHOICE':
-      return { ...state, lastChosenChoiceIndex: action.payload };
-    case 'ADD_PLAYER_REFLECTION':
-      return {
-        ...state,
-        historyLog: [...state.historyLog, {
-          id: `hist_reflect_${new Date().toISOString()}`,
-          sceneSummary: action.payload,
-          fullSceneText: action.payload,
-          timestamp: new Date().toISOString(),
-          type: 'reflection'
-        }]
-      };
-    case 'DISMISS_DREAM_VISION':
-      return { ...state, dreamOrVisionToDisplay: null };
-    case 'SUBMIT_LORE_INTERPRETATION':
-      return { ...state, awaitingLoreInterpretation: false, loreToInterpret: undefined };
-    case 'CANCEL_LORE_INTERPRETATION':
-      return { ...state, awaitingLoreInterpretation: false, loreToInterpret: undefined };
-    case 'CLEAR_INSIGHT_TO_NAME':
-      return { ...state, insightToName: null };
+const worldReducer = (state: GameState, action: Action): GameState => {
+    switch (action.type) {
+        case 'API_CALL_SUCCESS':
+            const data = action.payload;
+            const newHistoryEntry: HistoryEntry = {
+                id: `hist_${new Date().toISOString()}`,
+                sceneSummary: data.scene.substring(0, 150) + (data.scene.length > 150 ? "..." : ""),
+                fullSceneText: data.scene,
+                choiceMade: state.historyLog.find(h => h.type === 'choice')?.choiceMade,
+                timestamp: new Date().toISOString(),
+                type: 'story'
+            };
 
-    case 'PLAYER_NOTES_TOGGLE':
-      return { ...state, showPlayerNotesModal: !state.showPlayerNotesModal };
-    case 'ADD_PLAYER_NOTE':
-      const newNote: PlayerNote = {
-        id: `note_${new Date().toISOString()}`,
-        timestamp: new Date().toISOString(),
-        ...action.payload
-      };
-      return { ...state, playerNotes: [...state.playerNotes, newNote] };
-    case 'UPDATE_PLAYER_NOTE':
-      return { ...state, playerNotes: state.playerNotes.map(n => n.id === action.payload.id ? action.payload : n) };
-    case 'DELETE_PLAYER_NOTE':
-      return { ...state, playerNotes: state.playerNotes.filter(n => n.id !== action.payload) };
+            const updatedFragments = data.loreFragments
+                ? state.loreFragments.filter(f => !data.loreFragments?.some(df => df.id === f.id)).concat(data.loreFragments)
+                : state.loreFragments;
 
-    case 'MAP_TOGGLE':
-      return { ...state, showMapModal: !state.showMapModal };
-    case 'ECHO_WEAVING_TOGGLE':
-        return { ...state, showEchoWeavingModal: !state.showEchoWeavingModal };
-    case 'SET_LANGUAGE':
-        return {
-            ...initialState, // Start from a clean slate
-            currentLanguage: action.payload,
-            characterProfile: null,
-            gameStarted: false,
-            activeEchoHotspots: [],
+            const updatedInventory = { ...state.playerInventory };
+            if (data.newItemsGranted) {
+                Object.entries(data.newItemsGranted).forEach(([itemName, itemData]) => {
+                    if (updatedInventory[itemName]) {
+                        updatedInventory[itemName].count += itemData.count;
+                    } else {
+                        updatedInventory[itemName] = itemData;
+                    }
+                });
+            }
+
+            const updatedConditions = data.playerConditionUpdate
+                ? [...state.playerConditions.filter(c => c.type !== data.playerConditionUpdate!.type), data.playerConditionUpdate]
+                : state.playerConditions;
+
+            // Cap the history log
+            const cappedHistoryLog = [...state.historyLog, newHistoryEntry].slice(-HISTORY_LOG_CAP);
+            
+            saveGameStateToLocalStorage({ ...state, historyLog: cappedHistoryLog });
+
+
+            return {
+                ...state,
+                isLoading: false,
+                streamingSceneText: null,
+                currentScene: data.scene,
+                choices: data.choices || [],
+                currentImagePrompt: data.imagePrompt === null ? state.currentImagePrompt : (data.imagePrompt || state.currentImagePrompt),
+                whisperingEchoes: data.whisperingEchoes || [],
+                loreJournal: data.newLore ? [...state.loreJournal, ...data.newLore] : state.loreJournal,
+                newestLoreEntryId: data.newLore && data.newLore.length > 0 ? data.newLore[data.newLore.length - 1].id : null,
+                loreFragments: updatedFragments,
+                currentSoundscape: data.soundscape || state.currentSoundscape,
+                playerEchoicSignature: data.initialPlayerEchoicSignature || data.playerEchoicSignatureUpdate || state.playerEchoicSignature,
+                factionReputationNotes: data.factionUpdates ? { ...state.factionReputationNotes, ...data.factionUpdates } : state.factionReputationNotes,
+                renown: data.renownChangeAmount !== undefined ? state.renown + data.renownChangeAmount : state.renown,
+                lastRenownNarrative: data.renownChangeNarrative || state.lastRenownNarrative,
+                historyLog: cappedHistoryLog,
+                insightToName: data.offerToNameInsight ? data.namedInsightContext || state.insightToName : null,
+                currentTimeOfDay: data.currentTimeOfDay || state.currentTimeOfDay,
+                currentWeather: data.currentWeather || state.currentWeather,
+                playerInventory: updatedInventory,
+                lastChosenChoiceIndex: null, // Reset after processing
+                currentRumors: data.rumorMillUpdate ? [...state.currentRumors, data.rumorMillUpdate] : state.currentRumors,
+                dreamOrVisionToDisplay: data.playerDreamOrVision || state.dreamOrVisionToDisplay,
+                awaitingLoreInterpretation: !!data.interpretiveChoicesForLore,
+                loreToInterpret: data.interpretiveChoicesForLore || state.loreToInterpret,
+                activeDissonanceEffect: data.dissonanceEffectInScene || null,
+                playerConditions: updatedConditions,
+                echoicBlightInScene: data.echoicBlightInScene || null,
+                activeMemoryPhantoms: data.memoryPhantomsInScene || [],
+                devouringSilenceZoneInScene: data.devouringSilenceZoneInScene || null,
+                activeDissonantAberrations: data.dissonantAberrationsInScene || [],
+                characterProfile: data.confirmedProfileSummary && state.characterProfile ? { ...state.characterProfile } : state.characterProfile,
+                activeEchoHotspots: data.activeEchoHotspots || [],
+                resonanceSurgeCooldown: data.suggestedResonanceSurgeCooldown !== undefined ? data.suggestedResonanceSurgeCooldown : state.resonanceSurgeCooldown,
+                isResonanceSurgeAvailable: data.suggestedResonanceSurgeCooldown !== undefined ? false : state.isResonanceSurgeAvailable,
+                discoveredLocations: data.newLocationDiscovered ? [...state.discoveredLocations.filter(l => l.id !== data.newLocationDiscovered!.id), data.newLocationDiscovered] : state.discoveredLocations,
+                currentLocationId: data.newLocationDiscovered ? data.newLocationDiscovered.id : state.currentLocationId,
+            };
+        case 'SUMMARIZE_HISTORY_SUCCESS':
+            const summaryHistoryEntry: HistoryEntry = {
+                id: `hist_summary_${new Date().toISOString()}`,
+                sceneSummary: "The chronicle was summarized for clarity.",
+                fullSceneText: `New Summary: ${action.payload}`,
+                timestamp: new Date().toISOString(),
+                type: 'summary'
+            };
+            return { ...state, storySummary: action.payload, historyLog: [...state.historyLog, summaryHistoryEntry] };
+        case 'ADD_HISTORY_ENTRY':
+            return { ...state, historyLog: [...state.historyLog, action.payload] };
+        case 'ADD_PLAYER_REFLECTION':
+            return {
+                ...state,
+                historyLog: [...state.historyLog, {
+                    id: `hist_reflect_${new Date().toISOString()}`,
+                    sceneSummary: action.payload,
+                    fullSceneText: action.payload,
+                    timestamp: new Date().toISOString(),
+                    type: 'reflection'
+                }]
+            };
+        case 'SUBMIT_LORE_INTERPRETATION':
+            return { ...state, awaitingLoreInterpretation: false, loreToInterpret: undefined };
+        case 'CANCEL_LORE_INTERPRETATION':
+            return { ...state, awaitingLoreInterpretation: false, loreToInterpret: undefined };
+        case 'CLEAR_INSIGHT_TO_NAME':
+            return { ...state, insightToName: null };
+        default:
+            return state;
+    }
+};
+
+const gameReducer = (state: GameState, action: Action): GameState => {
+    // Top-level actions that affect multiple domains or the entire app state
+    switch (action.type) {
+        case 'START_GAME':
+            return { ...state, isLoading: true, error: null, gameStarted: true, introVideoUrl: null, isIntroVideoLoading: true, introVideoLoadingMessage: '' };
+        case 'RESET_GAME':
+            localStorage.removeItem('resonantEchoes_gameState');
+            return { ...initialState, apiKeyMissing: state.apiKeyMissing, homeScreenImageUrl: state.homeScreenImageUrl, activeDissonantAberrations: [] };
+        case 'INITIALIZE_GAME_STATE':
+            return { ...action.payload, activeEchoHotspots: action.payload.activeEchoHotspots || [], activeDissonantAberrations: action.payload.activeDissonantAberrations || [] };
+        case 'START_GAMEPLAY_TRANSITION':
+            return { ...state, gameStarted: true };
+        case 'SET_LANGUAGE':
+            const settingsToPreserve = {
+                currentVolume: state.currentVolume,
+                isMuted: state.isMuted,
+                isColorBlindAssistActive: state.isColorBlindAssistActive,
+                homeScreenImageUrl: state.homeScreenImageUrl,
+            };
+            localStorage.removeItem('resonantEchoes_gameState');
+            return { ...initialState, ...settingsToPreserve, currentLanguage: action.payload };
+        default:
+            // Delegate to sub-reducers
+            let nextState = characterReducer(state, action);
+            nextState = playerReducer(nextState, action);
+            nextState = uiReducer(nextState, action);
+            nextState = worldReducer(nextState, action);
+            return nextState;
+    }
+};
+
+const saveGameStateToLocalStorage = (state: GameState) => {
+    try {
+        const stateToSave: Partial<GameState> = {
+            // Persist everything EXCEPT transient UI state
+            characterProfile: state.characterProfile,
+            choices: state.choices,
+            currentImagePrompt: state.currentImagePrompt,
+            currentImageUrl: state.currentImageUrl,
+            currentLanguage: state.currentLanguage,
+            currentLocationId: state.currentLocationId,
+            currentRumors: state.currentRumors,
+            currentScene: state.currentScene,
+            currentSoundscape: state.currentSoundscape,
+            currentTimeOfDay: state.currentTimeOfDay,
+            currentVolume: state.currentVolume,
+            currentWeather: state.currentWeather,
+            discoveredLocations: state.discoveredLocations,
+            factionReputationNotes: state.factionReputationNotes,
+            firstName: state.firstName,
+            gameStarted: state.gameStarted,
+            historyLog: state.historyLog,
+            isColorBlindAssistActive: state.isColorBlindAssistActive,
+            isMuted: state.isMuted,
+            isResonanceSurgeAvailable: state.isResonanceSurgeAvailable,
+            loreFragments: state.loreFragments,
+            loreJournal: state.loreJournal,
+            playerConditions: state.playerConditions,
+            playerEchoicSignature: state.playerEchoicSignature,
+            playerInventory: state.playerInventory,
+            playerNotes: state.playerNotes,
+            renown: state.renown,
+            resonanceSurgeCooldown: state.resonanceSurgeCooldown,
+            selectedArchetypeId: state.selectedArchetypeId,
+            selectedBackgroundId: state.selectedBackgroundId,
+            selectedOriginId: state.selectedOriginId,
+            storySummary: state.storySummary,
+            whisperingEchoes: state.whisperingEchoes,
+            mindMapLayout: state.mindMapLayout,
         };
-
-    case 'INTRO_VIDEO_START':
-        return { ...state, isIntroVideoLoading: true, introVideoLoadingMessage: action.payload.message };
-    case 'INTRO_VIDEO_LOADING_UPDATE':
-        return { ...state, introVideoLoadingMessage: action.payload.message };
-    case 'INTRO_VIDEO_SUCCESS':
-        return { ...state, isIntroVideoLoading: false, introVideoUrl: action.payload.url };
-    case 'INTRO_VIDEO_FAILURE':
-        // If video fails, we want to immediately move to the next phase
-        return { ...state, isIntroVideoLoading: false, introVideoUrl: null, gameStarted: true, error: null }; // Clear the error to not show error screen
-
-    default:
-      return state;
-  }
+        const serializedState = JSON.stringify(stateToSave);
+        localStorage.setItem('resonantEchoes_gameState', serializedState);
+    } catch (error) {
+        console.error("Could not save game state to localStorage:", error);
+    }
 };
 
 
@@ -564,9 +659,19 @@ const initializeState = (initialState: GameState): GameState => {
   }
 };
 
+const getApiErrorMessage = (error: any, t: (key: string) => string): string => {
+    const errorMessage = (error?.message || String(error)).toLowerCase();
+    if (errorMessage.includes('api key')) {
+        return t(API_KEY_ERROR_MESSAGE_KEY);
+    }
+    if (errorMessage.includes('network') || errorMessage.includes('failed to fetch')) {
+        return t(NETWORK_ERROR_MESSAGE_KEY);
+    }
+    return t(GENERIC_API_ERROR_MESSAGE_KEY);
+};
+
 
 const App: React.FC = () => {
-
   const [state, dispatch] = useReducer(gameReducer, initialState, initializeState);
   const audioService = useRef(new AudioService());
   const hasSentApiCall = useRef(false);
@@ -588,45 +693,34 @@ const App: React.FC = () => {
     const cb = localStorage.getItem('colorBlindAssist') === 'true';
     document.documentElement.classList.toggle('theme-dark', theme === 'dark');
     document.documentElement.classList.toggle('cb-assist-active', cb);
-    if(cb) dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' });
+    if(cb && !state.isColorBlindAssistActive) dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' });
     audioService.current.setVolume(state.currentVolume / 100);
     audioService.current.toggleMute(state.isMuted);
   }, []); // Run only once on mount
 
-  useEffect(() => {
-    if (state.gameStarted) {
-      try {
-        const stateToSave = { ...state, error: null, isLoading: false, isTransitioning: false };
-        const serializedState = JSON.stringify(stateToSave);
-        localStorage.setItem('resonantEchoes_gameState', serializedState);
-      } catch (error) {
-        console.error("Could not save game state to localStorage:", error);
-      }
-    }
-  }, [state]);
-
   const handleFullReset = useCallback(() => {
-    localStorage.removeItem('resonantEchoes_gameState');
+    dispatch({ type: 'RESET_GAME' });
     window.location.reload();
   }, []);
   
-  const handleLanguageChangeAndReset = (lang: 'en' | 'pt') => {
-    localStorage.setItem('resonantEchoes_language', lang);
-    localStorage.removeItem('resonantEchoes_gameState');
-    localStorage.removeItem('resonantEchoes_introVideo');
-    window.location.reload();
+  const handleLanguageChange = (lang: 'en' | 'pt') => {
+    if (lang !== state.currentLanguage) {
+        localStorage.setItem('resonantEchoes_language', lang);
+        dispatch({ type: 'SET_LANGUAGE', payload: lang });
+    }
   };
 
-  const callGeminiAPI = useCallback(async (prompt: string, isRetry = false) => {
+  const callGeminiAPIStream = useCallback(async (prompt: string, message?: string) => {
     if (!process.env.API_KEY) {
       dispatch({ type: 'API_CALL_FAILURE', payload: t(API_KEY_ERROR_MESSAGE_KEY) });
       return;
     }
-    dispatch({ type: 'API_CALL_START' });
+    dispatch({ type: 'API_CALL_START', payload: { message } });
     hasSentApiCall.current = true;
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
+      const response = await ai.models.generateContentStream({
         model: GEMINI_NARRATIVE_MODEL,
         contents: prompt,
         config: {
@@ -634,20 +728,40 @@ const App: React.FC = () => {
           responseMimeType: 'application/json'
         },
       });
-
-      const responseText = response.text.trim();
-      const responseData: GeminiResponseData = JSON.parse(responseText);
-      dispatch({ type: 'API_CALL_SUCCESS', payload: responseData });
-    } catch (error: any) {
-      console.error("Error calling Gemini API:", error);
-      if (!isRetry) {
-        console.log("Retrying API call once...");
-        callGeminiAPI(prompt, true);
-      } else {
-        dispatch({ type: 'API_CALL_FAILURE', payload: t(GENERIC_API_ERROR_MESSAGE_KEY) });
+      
+      let buffer = '';
+      for await (const chunk of response) {
+        buffer += chunk.text;
+        dispatch({ type: 'STREAMING_TEXT_UPDATE', payload: buffer });
       }
+
+      const responseData: GeminiResponseData = JSON.parse(buffer);
+      dispatch({ type: 'API_CALL_SUCCESS', payload: responseData });
+
+    } catch (error: any) {
+      console.error("Error calling Gemini API Stream:", error);
+      dispatch({ type: 'API_CALL_FAILURE', payload: getApiErrorMessage(error, t) });
     }
   }, [t]);
+  
+  const callGeminiAPIForSummary = useCallback(async (prompt: string): Promise<string | null> => {
+    if (!process.env.API_KEY) {
+        dispatch({ type: 'API_CALL_FAILURE', payload: t(API_KEY_ERROR_MESSAGE_KEY) });
+        return null;
+    }
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: GEMINI_NARRATIVE_MODEL,
+            contents: prompt,
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error fetching summary from Gemini API:", error);
+        return null; 
+    }
+  }, [t]);
+
 
   const fetchImage = useCallback(async (prompt: string) => {
     if (!process.env.API_KEY) return;
@@ -693,7 +807,7 @@ const App: React.FC = () => {
       dispatch({ type: 'SET_HOME_SCREEN_IMAGE_URL', payload: { url: imageUrl } });
     } catch (error) {
       console.error("Error generating home screen image:", error);
-      dispatch({ type: 'SET_HOME_SCREEN_IMAGE_URL', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, error: t(GENERIC_API_ERROR_MESSAGE_KEY) } });
+      dispatch({ type: 'SET_HOME_SCREEN_IMAGE_URL', payload: { url: PLACEHOLDER_HOME_SCREEN_IMAGE_URL, error: getApiErrorMessage(error, t) } });
     }
   }, [t]);
 
@@ -701,12 +815,10 @@ const App: React.FC = () => {
   const fetchIntroVideo = async () => {
     dispatch({ type: 'INTRO_VIDEO_START', payload: { message: t('Conjuring a vision...') } });
     
-    // Check local storage for cached video URL
     const cachedVideoData = localStorage.getItem('resonantEchoes_introVideo');
     if (cachedVideoData) {
         try {
             const { url, timestamp } = JSON.parse(cachedVideoData);
-            // Cache is valid for 1 day
             const oneDay = 24 * 60 * 60 * 1000; 
             if (url && Date.now() - timestamp < oneDay) {
                 console.log("Using cached intro video URL.");
@@ -716,7 +828,7 @@ const App: React.FC = () => {
             }
         } catch (e) {
             console.error("Failed to parse cached video data, fetching new video.", e);
-            localStorage.removeItem('resonantEchoes_introVideo'); // Clear corrupted cache
+            localStorage.removeItem('resonantEchoes_introVideo');
         }
     }
 
@@ -766,12 +878,21 @@ const App: React.FC = () => {
   };
 
 
-  const buildGameContext = useCallback((): GameContextForAI => {
-    const recentHistory = state.historyLog.slice(-5).map(h => h.sceneSummary).join(' | ');
-    const knownLoreTitles = state.loreJournal.map(l => l.playerGivenName || l.title);
-    const knownLoreFragmentTitles = state.loreFragments.map(f => f.titleHint);
-    const activeEchoesTexts = state.whisperingEchoes.map(e => e.text);
-    const currentInventory = state.playerInventory ? Object.entries(state.playerInventory).reduce((acc, [name, data]) => {
+  const buildGameContext = useCallback((currentState: GameState = state): GameContextForAI => {
+    const historyForSummary = currentState.storySummary
+        ? currentState.historyLog.slice(-3)
+        : currentState.historyLog.slice(-5);
+
+    const recentHistory = historyForSummary.map(h => {
+        if (h.type === 'choice') return `You chose: "${h.choiceMade}"`;
+        if (h.type === 'story') return `Scene: ${h.sceneSummary}`;
+        return null;
+    }).filter(Boolean).join(' -> ');
+    
+    const knownLoreTitles = currentState.loreJournal.map(l => l.playerGivenName || l.title);
+    const knownLoreFragmentTitles = currentState.loreFragments.map(f => f.titleHint);
+    const activeEchoesTexts = currentState.whisperingEchoes.map(e => e.text);
+    const currentInventory = currentState.playerInventory ? Object.entries(currentState.playerInventory).reduce((acc, [name, data]) => {
       acc[name] = {
         count: data.count,
         description: data.description,
@@ -785,45 +906,47 @@ const App: React.FC = () => {
     }, {} as GameContextForAI['playerInventory']) : {};
 
     return {
-      characterProfile: state.characterProfile ? {
-        archetypeTitle: state.characterProfile.archetype.title,
-        originName: state.characterProfile.origin.name,
-        backgroundTitle: state.characterProfile.background.title,
-        firstName: state.characterProfile.firstName,
-        startingBenefitDescription: state.characterProfile.background.benefit.description
+      characterProfile: currentState.characterProfile ? {
+        archetypeTitle: currentState.characterProfile.archetype.title,
+        originName: currentState.characterProfile.origin.name,
+        backgroundTitle: currentState.characterProfile.background.title,
+        firstName: currentState.characterProfile.firstName,
+        startingBenefitDescription: currentState.characterProfile.background.benefit.description
       } : null,
-      lastPlayerChoice: state.historyLog.filter(h => h.type === 'choice').slice(-1)[0]?.choiceMade,
+      storySummary: currentState.storySummary,
+      lastPlayerChoice: currentState.historyLog.filter(h => h.type === 'choice').slice(-1)[0]?.choiceMade,
       recentHistorySummary: recentHistory,
       knownLoreTitles,
       knownLoreFragmentTitles,
       activeEchoesTexts,
-      playerEchoicSignature: state.playerEchoicSignature,
-      factionReputationNotes: state.factionReputationNotes,
-      currentRenown: state.renown,
-      currentTimeOfDay: state.currentTimeOfDay,
-      currentWeather: state.currentWeather,
+      playerEchoicSignature: currentState.playerEchoicSignature,
+      factionReputationNotes: currentState.factionReputationNotes,
+      currentRenown: currentState.renown,
+      currentTimeOfDay: currentState.currentTimeOfDay,
+      currentWeather: currentState.currentWeather,
       playerInventory: currentInventory,
-      currentRumors: state.currentRumors,
-      currentActiveDissonanceEffect: state.activeDissonanceEffect?.description,
-      currentPlayerConditions: state.playerConditions.map(c => c.description),
-      activeEchoHotspotsSummary: state.activeEchoHotspots?.map(h => ({id: h.id, name: h.name})),
-      isResonanceSurgeAvailable: state.isResonanceSurgeAvailable,
-      resonanceSurgeCooldownTurnsLeft: state.resonanceSurgeCooldown,
-      discoveredLocationsSummary: state.discoveredLocations.map(l => ({ name: l.name })),
-      currentLocationName: state.discoveredLocations.find(l => l.id === state.currentLocationId)?.name,
-      language: state.currentLanguage,
+      currentRumors: currentState.currentRumors,
+      currentActiveDissonanceEffect: currentState.activeDissonanceEffect?.description,
+      currentPlayerConditions: currentState.playerConditions.map(c => c.description),
+      activeDissonantAberrationsSummary: currentState.activeDissonantAberrations?.map(a => ({name: a.name, nature: a.aberrationNature})),
+      activeEchoHotspotsSummary: currentState.activeEchoHotspots?.map(h => ({id: h.id, name: h.name})),
+      isResonanceSurgeAvailable: currentState.isResonanceSurgeAvailable,
+      resonanceSurgeCooldownTurnsLeft: currentState.resonanceSurgeCooldown,
+      discoveredLocationsSummary: currentState.discoveredLocations.map(l => ({ name: l.name })),
+      currentLocationName: currentState.discoveredLocations.find(l => l.id === currentState.currentLocationId)?.name,
+      language: currentState.currentLanguage,
     };
   }, [state]);
 
   useEffect(() => {
     if (state.gameStarted && !state.characterProfile && !hasSentApiCall.current && state.currentScene === '') {
-      callGeminiAPI(INITIAL_GAME_PROMPT);
+      callGeminiAPIStream(buildCharacterCreationIntroPrompt());
     }
-  }, [state.gameStarted, state.characterProfile, state.currentScene, callGeminiAPI]);
+  }, [state.gameStarted, state.characterProfile, state.currentScene, callGeminiAPIStream]);
 
 
   useEffect(() => {
-    if (state.currentImagePrompt && state.currentImagePrompt !== '') {
+    if (state.currentImagePrompt) {
       fetchImage(state.currentImagePrompt);
     }
   }, [state.currentImagePrompt, fetchImage]);
@@ -834,12 +957,9 @@ const App: React.FC = () => {
     }
   }, [state.currentSoundscape]);
 
-  const handleChoice = useCallback((choice: string, index: number) => {
+  const handleChoice = useCallback(async (choice: string, index: number) => {
     dispatch({ type: 'SET_LAST_CHOICE', payload: index });
-    const context = buildGameContext();
-    context.lastPlayerChoice = choice;
-    const prompt = CONTINUE_GAME_PROMPT_TEMPLATE(context);
-    callGeminiAPI(prompt);
+    
     const newHistoryEntry: HistoryEntry = {
       id: `hist_choice_${new Date().toISOString()}`,
       sceneSummary: `Made choice: "${choice}"`,
@@ -849,52 +969,69 @@ const App: React.FC = () => {
       type: 'choice'
     };
     dispatch({ type: 'ADD_HISTORY_ENTRY', payload: newHistoryEntry });
-  }, [buildGameContext, callGeminiAPI, state.currentScene]);
+    
+    const newStateAfterChoice = { ...state, historyLog: [...state.historyLog, newHistoryEntry] };
+    
+    const turnCount = newStateAfterChoice.historyLog.filter(h => h.type === 'story').length;
+    let currentContext = buildGameContext(newStateAfterChoice);
+    let summaryMessage: string | undefined = undefined;
+
+    if (turnCount > 0 && turnCount % 7 === 0) {
+        summaryMessage = t("Summarizing the chronicle...");
+        const summaryPrompt = buildSummarizeHistoryPrompt(
+            newStateAfterChoice.storySummary,
+            newStateAfterChoice.historyLog
+        );
+        const summary = await callGeminiAPIForSummary(summaryPrompt);
+        if (summary) {
+            dispatch({ type: 'SUMMARIZE_HISTORY_SUCCESS', payload: summary });
+            const newStateAfterSummary = { ...newStateAfterChoice, storySummary: summary };
+            currentContext = buildGameContext(newStateAfterSummary);
+        }
+    }
+
+    currentContext.lastPlayerChoice = choice;
+    const prompt = buildContinueGamePrompt(currentContext);
+    callGeminiAPIStream(prompt, summaryMessage);
+
+  }, [state, buildGameContext, callGeminiAPIStream, callGeminiAPIForSummary, t]);
 
   const handleSynthesizeEchoes = () => {
     const context = buildGameContext();
-    const prompt = SYNTHESIZE_ECHOES_PROMPT_TEMPLATE(context);
-    callGeminiAPI(prompt);
-    // ... update history log
+    const prompt = buildSynthesizeEchoesPrompt(context);
+    callGeminiAPIStream(prompt);
   };
 
   const handleFocusSenses = () => {
       const context = buildGameContext();
-      const prompt = FOCUS_SENSES_PROMPT_TEMPLATE(context);
-      callGeminiAPI(prompt);
+      const prompt = buildFocusSensesPrompt(context);
+      callGeminiAPIStream(prompt);
   };
   
   const handleCustomAction = (actionText: string) => {
       const context = buildGameContext();
-      const prompt = CUSTOM_ACTION_PROMPT_TEMPLATE(context, actionText);
-      callGeminiAPI(prompt);
+      const prompt = buildCustomActionPrompt(context, actionText);
+      callGeminiAPIStream(prompt);
   };
 
   const handleSynthesizeFragments = (fragmentIds: string[]) => {
     const fragmentsToSynthesize = state.loreFragments.filter(f => fragmentIds.includes(f.id));
     if (fragmentsToSynthesize.length < 2) return;
     const context = buildGameContext();
-    const prompt = SYNTHESIZE_LORE_FRAGMENTS_PROMPT_TEMPLATE(context, fragmentsToSynthesize.map(f => f.titleHint));
-    callGeminiAPI(prompt);
-    // ... update history log
+    const prompt = buildSynthesizeLoreFragmentsPrompt(context, fragmentsToSynthesize.map(f => f.titleHint));
+    callGeminiAPIStream(prompt);
   };
   
   const handleAttuneToArtifact = (itemName: string) => {
     const context = buildGameContext();
-    const prompt = ATTUNE_TO_ARTIFACT_PROMPT_TEMPLATE(context, itemName);
-    callGeminiAPI(prompt);
-    //... update history log
+    const prompt = buildAttuneToArtifactPrompt(context, itemName);
+    callGeminiAPIStream(prompt);
   };
 
   const handleRequestReflection = () => {
     const context = buildGameContext();
-    const prompt = REQUEST_PLAYER_REFLECTION_PROMPT_TEMPLATE(context.recentHistorySummary, state.currentScene, state.playerEchoicSignature, state.characterProfile, state.currentLanguage);
-    // This is a special case, we're not asking the AI to advance the game
-    // We'd need a separate API call for this, or a specific mode in the backend.
-    // For now, let's fake it client side or make a special Gemini call.
-    // Let's assume the Core System Prompt handles this request type.
-    // The AI response should just contain the `playerReflection` field.
-    callGeminiAPI(prompt); // The prompt asks AI to provide reflection
+    const prompt = buildRequestPlayerReflectionPrompt(context.recentHistorySummary, state.currentScene, state.playerEchoicSignature, state.characterProfile, state.currentLanguage);
+    callGeminiAPIStream(prompt);
   };
 
   const handleNameInsight = (name: string) => {
@@ -903,8 +1040,8 @@ const App: React.FC = () => {
       originalInsight: state.insightToName!,
       chosenName: name
     };
-    const prompt = CONTINUE_GAME_PROMPT_TEMPLATE(context);
-    callGeminiAPI(prompt);
+    const prompt = buildContinueGamePrompt(context);
+    callGeminiAPIStream(prompt);
     dispatch({ type: 'CLEAR_INSIGHT_TO_NAME' });
   };
   
@@ -915,23 +1052,23 @@ const App: React.FC = () => {
           loreTitle: state.loreToInterpret!.title,
           chosenInterpretation: interpretation,
       };
-      const prompt = CONTINUE_GAME_PROMPT_TEMPLATE(context);
-      callGeminiAPI(prompt);
+      const prompt = buildContinueGamePrompt(context);
+      callGeminiAPIStream(prompt);
   };
 
   const handleArchetypeChoice = (archetypeId: string) => {
     dispatch({ type: 'CHOOSE_ARCHETYPE', payload: archetypeId });
     const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === archetypeId)!;
-    const prompt = ARCHETYPE_SELECTED_PROMPT_TEMPLATE(chosenArchetype);
-    callGeminiAPI(prompt);
+    const prompt = buildArchetypeSelectedPrompt(chosenArchetype);
+    callGeminiAPIStream(prompt);
   };
 
   const handleOriginChoice = (originId: string) => {
     dispatch({ type: 'CHOOSE_ORIGIN', payload: originId });
     const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === state.selectedArchetypeId)!;
     const chosenOrigin = ORIGINS_DATA.find(o => o.id === originId)!;
-    const prompt = ORIGIN_SELECTED_PROMPT_TEMPLATE(chosenArchetype, chosenOrigin);
-    callGeminiAPI(prompt);
+    const prompt = buildOriginSelectedPrompt(chosenArchetype, chosenOrigin);
+    callGeminiAPIStream(prompt);
   };
   
   const handleBackgroundChoice = (backgroundId: string) => {
@@ -939,8 +1076,8 @@ const App: React.FC = () => {
     const chosenArchetype = ARCHETYPES_DATA.find(a => a.id === state.selectedArchetypeId)!;
     const chosenOrigin = ORIGINS_DATA.find(o => o.id === state.selectedOriginId)!;
     const chosenBackground = BACKGROUNDS_DATA.find(b => b.id === backgroundId)!;
-    const prompt = BACKGROUND_SELECTED_PROMPT_TEMPLATE(chosenArchetype, chosenOrigin, chosenBackground);
-    callGeminiAPI(prompt);
+    const prompt = buildBackgroundSelectedPrompt(chosenArchetype, chosenOrigin, chosenBackground);
+    callGeminiAPIStream(prompt);
   };
 
   const handleNameSubmission = (name: string) => {
@@ -951,8 +1088,8 @@ const App: React.FC = () => {
         background: BACKGROUNDS_DATA.find(b => b.id === state.selectedBackgroundId)!,
         firstName: name
     };
-    const prompt = NAME_SUBMITTED_PROMPT_TEMPLATE(tempProfile);
-    callGeminiAPI(prompt);
+    const prompt = buildNameSubmittedPrompt(tempProfile);
+    callGeminiAPIStream(prompt);
   };
 
 
@@ -998,12 +1135,12 @@ const App: React.FC = () => {
             <HomeScreen
               t={t}
               onStartNewGame={startGameFlow}
-              onOpenSettings={() => dispatch({ type: 'TOGGLE_SETTINGS_PANEL' })}
+              onOpenSettings={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'settings' })}
               homeScreenImageUrl={state.homeScreenImageUrl}
               isLoading={state.isHomeScreenImageLoading}
               error={state.error}
             />
-            {state.showSettingsPanel && <SettingsPanel t={t} isOpen={state.showSettingsPanel} onClose={() => dispatch({ type: 'TOGGLE_SETTINGS_PANEL' })} currentTheme={document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'} onToggleTheme={() => { document.documentElement.classList.toggle('theme-dark'); localStorage.setItem('theme', document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'); }} volume={state.currentVolume} onVolumeChange={(v) => dispatch({ type: 'UPDATE_VOLUME', payload: v })} isMuted={state.isMuted} onMuteToggle={() => dispatch({ type: 'TOGGLE_MUTE' })} isColorBlindAssistActive={state.isColorBlindAssistActive} onToggleColorBlindAssist={() => { document.documentElement.classList.toggle('cb-assist-active'); localStorage.setItem('colorBlindAssist', document.documentElement.classList.contains('cb-assist-active') ? 'true' : 'false'); dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' }); }} currentLanguage={state.currentLanguage} onLanguageChangeAndReset={handleLanguageChangeAndReset} />}
+            <SettingsPanel t={t} isOpen={state.activeModal === 'settings'} onClose={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} currentTheme={document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'} onToggleTheme={() => { document.documentElement.classList.toggle('theme-dark'); localStorage.setItem('theme', document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'); }} volume={state.currentVolume} onVolumeChange={(v) => dispatch({ type: 'UPDATE_VOLUME', payload: v })} isMuted={state.isMuted} onMuteToggle={() => dispatch({ type: 'TOGGLE_MUTE' })} isColorBlindAssistActive={state.isColorBlindAssistActive} onToggleColorBlindAssist={() => { document.documentElement.classList.toggle('cb-assist-active'); localStorage.setItem('colorBlindAssist', document.documentElement.classList.contains('cb-assist-active') ? 'true' : 'false'); dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' }); }} currentLanguage={state.currentLanguage} onLanguageChange={handleLanguageChange} />
           </>
         );
       
@@ -1014,7 +1151,7 @@ const App: React.FC = () => {
                   videoUrl={state.introVideoUrl}
                   isLoading={state.isIntroVideoLoading}
                   loadingMessage={state.introVideoLoadingMessage}
-                  onVideoEnd={() => dispatch({ type: 'INTRO_VIDEO_FAILURE', payload: { error: '' } })} // Fail to game start
+                  onVideoEnd={() => dispatch({ type: 'INTRO_VIDEO_FAILURE', payload: { error: '' } })}
                   onSkip={() => dispatch({ type: 'INTRO_VIDEO_FAILURE', payload: { error: '' } })}
                 />
       
@@ -1032,6 +1169,7 @@ const App: React.FC = () => {
           } else {
               title = t("Resonant Echoes");
           }
+          const isStreaming = state.streamingSceneText !== null;
 
           return (
             <div className="bg-primary min-h-screen text-main-color">
@@ -1046,7 +1184,7 @@ const App: React.FC = () => {
                     {/* Left Panel */}
                     <aside className="lg:col-span-1 space-y-4">
                         <RenownDisplay renown={state.renown} lastChangeNarrative={state.lastRenownNarrative} animateOnUpdate={state.lastChosenChoiceIndex !== null} />
-                        <GameStatusDisplay t={t} timeOfDay={state.currentTimeOfDay} weather={state.currentWeather} inventory={state.playerInventory} onAttune={handleAttuneToArtifact} characterProfile={state.characterProfile} />
+                        <GameStatusDisplay t={t} timeOfDay={state.currentTimeOfDay} weather={state.currentWeather} inventory={state.playerInventory} onAttune={handleAttuneToArtifact} characterProfile={state.characterProfile} activeAberrations={state.activeDissonantAberrations} />
                         {state.activeDissonanceEffect && (
                             <div className="p-3 bg-secondary rounded-lg shadow border-2 border-magical-dissonance-border">
                                 <h3 className="font-heading text-lg text-magical-dissonance-color mb-1">{t("Dissonance Active:")}</h3>
@@ -1065,22 +1203,22 @@ const App: React.FC = () => {
 
                     {/* Center Panel (Story & Choices) */}
                     <div className="lg:col-span-2 space-y-4">
-                        <ImageDisplay t={t} imageUrl={state.currentImageUrl} altText={state.currentImagePrompt || "Game Scene"} isLoading={state.isLoading && !state.currentImageUrl} />
+                        <ImageDisplay t={t} imageUrl={state.currentImageUrl} altText={state.currentImagePrompt || "Game Scene"} isLoading={!state.currentImageUrl && (state.isLoading || isStreaming)} />
                          <div className="p-4 bg-secondary rounded-lg shadow-lg border border-divider-color min-h-[10rem]">
                             <h2 className="font-heading text-3xl text-heading-color border-b-2 border-divider-color pb-2 mb-3">{t("The Unfolding Path")}</h2>
                             
-                            {state.isLoading && state.currentScene === "" ? (
+                            {(state.isLoading && !isStreaming) ? (
                                 <p className="text-muted-color italic">{t("The Weave Shimmers...")}</p>
                             ) : (
                               <>
-                                <StoryDisplay storyText={state.currentScene} />
+                                <StoryDisplay storyText={isStreaming ? state.streamingSceneText! : state.currentScene} isStreaming={isStreaming} />
                                 <div className="mt-6">
                                   <ChoicesDisplay 
                                       choices={state.choices} 
                                       onChoiceSelected={(choice, index) => {
-                                          if (gamePhase === GamePhase.ArchetypeSelection) handleArchetypeChoice(choice);
-                                          else if (gamePhase === GamePhase.OriginSelection) handleOriginChoice(choice);
-                                          else if (gamePhase === GamePhase.BackgroundSelection) handleBackgroundChoice(choice);
+                                          if (gamePhase === GamePhase.ArchetypeSelection) handleArchetypeChoice(ARCHETYPES_DATA.find(a=>a.title === choice)!.id);
+                                          else if (gamePhase === GamePhase.OriginSelection) handleOriginChoice(ORIGINS_DATA.find(o=>o.name === choice)!.id);
+                                          else if (gamePhase === GamePhase.BackgroundSelection) handleBackgroundChoice(BACKGROUNDS_DATA.find(b=>b.title === choice)!.id);
                                           else handleChoice(choice, index);
                                       }}
                                       isLoading={state.isLoading}
@@ -1099,7 +1237,7 @@ const App: React.FC = () => {
                     <aside className="lg:col-span-1 space-y-4">
                         <WhisperingEchoesDisplay t={t} echoes={state.whisperingEchoes} />
                         <div className="grid grid-cols-2 gap-2">
-                             <button onClick={handleSynthesizeEchoes} disabled={state.whisperingEchoes.length < 2 || state.isLoading} className="fantasy-button fantasy-button-secondary text-sm">
+                             <button onClick={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'weaving' })} disabled={state.whisperingEchoes.length === 0 || state.isLoading} className="fantasy-button fantasy-button-secondary text-sm">
                                 {t("Synthesize ({count})", { count: state.whisperingEchoes.length })}
                             </button>
                              <button onClick={handleFocusSenses} disabled={state.isLoading} className="fantasy-button fantasy-button-secondary text-sm">
@@ -1118,16 +1256,16 @@ const App: React.FC = () => {
                             </button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <button onClick={() => dispatch({ type: 'LORE_JOURNAL_TOGGLE' })} className="fantasy-button fantasy-button-primary text-sm">
+                            <button onClick={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'lore' })} className="fantasy-button fantasy-button-primary text-sm">
                                 {t("Tome ({count})", { count: state.loreJournal.length })}
                             </button>
-                             <button onClick={() => dispatch({ type: 'HISTORY_LOG_TOGGLE' })} className="fantasy-button fantasy-button-primary text-sm">
+                             <button onClick={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'history' })} className="fantasy-button fantasy-button-primary text-sm">
                                 {t("Path Taken ({count})", { count: state.historyLog.length })}
                             </button>
-                            <button onClick={() => dispatch({ type: 'PLAYER_NOTES_TOGGLE' })} className="fantasy-button fantasy-button-primary text-sm">
+                            <button onClick={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'notes' })} className="fantasy-button fantasy-button-primary text-sm">
                                 {t("My Journal ({count})", { count: state.playerNotes.length })}
                             </button>
-                            <button onClick={() => dispatch({ type: 'MAP_TOGGLE' })} className="fantasy-button fantasy-button-primary text-sm">
+                            <button onClick={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: 'map' })} className="fantasy-button fantasy-button-primary text-sm">
                                 {t("Map")}
                             </button>
                         </div>
@@ -1138,19 +1276,26 @@ const App: React.FC = () => {
                     <p>{t("Fonts: MedievalSharp & EB Garamond by Google Fonts.")}</p>
                 </footer>
               </main>
-              {state.showSettingsPanel && <SettingsPanel t={t} isOpen={state.showSettingsPanel} onClose={() => dispatch({ type: 'TOGGLE_SETTINGS_PANEL' })} currentTheme={document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'} onToggleTheme={() => { document.documentElement.classList.toggle('theme-dark'); localStorage.setItem('theme', document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'); }} volume={state.currentVolume} onVolumeChange={(v) => dispatch({ type: 'UPDATE_VOLUME', payload: v })} isMuted={state.isMuted} onMuteToggle={() => dispatch({ type: 'TOGGLE_MUTE' })} isColorBlindAssistActive={state.isColorBlindAssistActive} onToggleColorBlindAssist={() => { document.documentElement.classList.toggle('cb-assist-active'); localStorage.setItem('colorBlindAssist', document.documentElement.classList.contains('cb-assist-active') ? 'true' : 'false'); dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' }); }} currentLanguage={state.currentLanguage} onLanguageChangeAndReset={handleLanguageChangeAndReset} />}
-              <LoreJournal t={t} loreEntries={state.loreJournal} loreFragments={state.loreFragments} isOpen={state.showLoreJournalModal} onToggle={() => dispatch({ type: 'LORE_JOURNAL_TOGGLE' })} newestEntryId={state.newestLoreEntryId} onSynthesizeFragments={handleSynthesizeFragments} />
-              <HistoryLog t={t} historyLog={state.historyLog} isOpen={state.showHistoryLogModal} onToggle={() => dispatch({ type: 'HISTORY_LOG_TOGGLE' })} />
+              <SettingsPanel t={t} isOpen={state.activeModal === 'settings'} onClose={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} currentTheme={document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'} onToggleTheme={() => { document.documentElement.classList.toggle('theme-dark'); localStorage.setItem('theme', document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light'); }} volume={state.currentVolume} onVolumeChange={(v) => dispatch({ type: 'UPDATE_VOLUME', payload: v })} isMuted={state.isMuted} onMuteToggle={() => dispatch({ type: 'TOGGLE_MUTE' })} isColorBlindAssistActive={state.isColorBlindAssistActive} onToggleColorBlindAssist={() => { document.documentElement.classList.toggle('cb-assist-active'); localStorage.setItem('colorBlindAssist', document.documentElement.classList.contains('cb-assist-active') ? 'true' : 'false'); dispatch({ type: 'TOGGLE_COLOR_BLIND_ASSIST' }); }} currentLanguage={state.currentLanguage} onLanguageChange={handleLanguageChange} />
+              <LoreJournal t={t} loreEntries={state.loreJournal} loreFragments={state.loreFragments} isOpen={state.activeModal === 'lore'} onToggle={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} newestEntryId={state.newestLoreEntryId} onSynthesizeFragments={handleSynthesizeFragments} />
+              <HistoryLog t={t} historyLog={state.historyLog} isOpen={state.activeModal === 'history'} onToggle={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} />
               <DreamRumorDisplay t={t} dreamOrVision={state.dreamOrVisionToDisplay} rumors={state.currentRumors} onDismissDream={() => dispatch({ type: 'DISMISS_DREAM_VISION' })} />
               {state.awaitingLoreInterpretation && state.loreToInterpret && <LoreInterpretationModal t={t} loreTitle={state.loreToInterpret.title} interpretations={state.loreToInterpret.interpretations} onSubmit={handleInterpretLore} onCancel={() => dispatch({ type: 'CANCEL_LORE_INTERPRETATION' })} />}
-              <PlayerNotesModal t={t} isOpen={state.showPlayerNotesModal} onClose={() => dispatch({ type: 'PLAYER_NOTES_TOGGLE' })} notes={state.playerNotes} 
+              <PlayerNotesModal
+                t={t}
+                isOpen={state.activeModal === 'notes'}
+                onClose={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })}
+                notes={state.playerNotes}
+                loreEntries={state.loreJournal}
+                layout={state.mindMapLayout}
+                onLayoutChange={(layout) => dispatch({ type: 'UPDATE_MIND_MAP_LAYOUT', payload: layout })}
                 onAddNote={(note) => dispatch({ type: 'ADD_PLAYER_NOTE', payload: note })}
                 onUpdateNote={(note) => dispatch({ type: 'UPDATE_PLAYER_NOTE', payload: note })}
                 onDeleteNote={(id) => dispatch({ type: 'DELETE_PLAYER_NOTE', payload: id })}
               />
-              <MapModal t={t} isOpen={state.showMapModal} onClose={() => dispatch({ type: 'MAP_TOGGLE' })} locations={state.discoveredLocations} currentLocationId={state.currentLocationId} />
-              <EchoWeavingModal t={t} isOpen={state.showEchoWeavingModal} onClose={() => dispatch({ type: 'ECHO_WEAVING_TOGGLE' })} echoes={state.whisperingEchoes} onSynthesize={handleSynthesizeEchoes} />
-              <LoadingIndicator isLoading={state.isLoading && state.gameStarted && state.characterProfile != null} t={t} />
+              <MapModal t={t} isOpen={state.activeModal === 'map'} onClose={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} locations={state.discoveredLocations} currentLocationId={state.currentLocationId} />
+              <EchoWeavingModal t={t} isOpen={state.activeModal === 'weaving'} onClose={() => dispatch({ type: 'SET_ACTIVE_MODAL', payload: null })} echoes={state.whisperingEchoes} onSynthesize={handleSynthesizeEchoes} />
+              <LoadingIndicator isLoading={state.isLoading && !isStreaming && state.gameStarted && state.characterProfile != null} t={t} />
             </div>
           );
     }
