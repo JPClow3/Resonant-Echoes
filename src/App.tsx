@@ -3,6 +3,8 @@ import { useGameState } from './state/GameStateContext';
 import { useTranslation } from './lib/i18n';
 import { AudioService } from './services/audioService';
 import * as GeminiService from './services/geminiService';
+// Ensure we can access the helper for appending the API key
+// (if using "import * as ...", this works as GeminiService.getVideoUrlWithApiKey)
 import { GamePhase, CharacterProfile, GeminiResponseData, HistoryEntry, PlayerNote, MindMapLayout } from './types';
 import {
     buildCharacterCreationIntroPrompt, buildArchetypeSelectedPrompt, buildOriginSelectedPrompt,
@@ -174,7 +176,8 @@ const App: React.FC = () => {
         if (cachedVideo) {
              const { url, timestamp } = JSON.parse(cachedVideo);
              if (Date.now() - timestamp < 24 * 60 * 60 * 1000) { // 1 day cache
-                dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url } });
+                // On cache hit, re-apply API key before use
+                dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url: GeminiService.getVideoUrlWithApiKey(url) } });
                 return;
              }
         }
@@ -183,8 +186,10 @@ const App: React.FC = () => {
                 (message: string) => dispatch({ type: 'INTRO_VIDEO_LOADING_UPDATE', payload: { message } }),
                 t
             );
+            // Store only the *sanitized* video URL (without API key) in localStorage
             localStorage.setItem('resonantEchoes_introVideo', JSON.stringify({ url: videoUrl, timestamp: Date.now() }));
-            dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url: videoUrl } });
+            // When using the URL, always append the API key in-memory only
+            dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url: GeminiService.getVideoUrlWithApiKey(videoUrl) } });
         } catch (e: any) {
             dispatch({ type: 'INTRO_VIDEO_FAILURE', payload: { error: e.message || String(e) } });
         }

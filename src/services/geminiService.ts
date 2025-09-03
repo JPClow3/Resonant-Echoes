@@ -96,7 +96,8 @@ export async function generateIntroVideo(updateLoadingMessage: (message: string)
 
     if (operation.response?.generatedVideos?.[0]?.video?.uri) {
         const downloadLink = operation.response.generatedVideos[0].video.uri;
-        return `${downloadLink}&key=${API_KEY}`;
+        // Do NOT append API key to returned URL; handle API key in-memory only, when used
+        return downloadLink;
     } else {
         throw new Error("Video generation completed but no video URI was found.");
     }
