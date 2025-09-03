@@ -818,12 +818,13 @@ const App: React.FC = () => {
     const cachedVideoData = localStorage.getItem('resonantEchoes_introVideo');
     if (cachedVideoData) {
         try {
-            const { url, timestamp } = JSON.parse(cachedVideoData);
+            const { downloadUri, timestamp } = JSON.parse(cachedVideoData);
             const oneDay = 24 * 60 * 60 * 1000; 
-            if (url && Date.now() - timestamp < oneDay) {
+            if (downloadUri && Date.now() - timestamp < oneDay) {
+                const fullUrl = `${downloadUri}&key=${process.env.API_KEY}`;
                 console.log("Using cached intro video URL.");
                 audioService.current.playSound('VIDEO_READY');
-                dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url } });
+                dispatch({ type: 'INTRO_VIDEO_SUCCESS', payload: { url: fullUrl } });
                 return;
             }
         } catch (e) {
@@ -862,7 +863,7 @@ const App: React.FC = () => {
             const downloadLink = operation.response.generatedVideos[0].video.uri;
             const videoUrl = `${downloadLink}&key=${process.env.API_KEY}`;
             
-            const videoDataToCache = JSON.stringify({ url: videoUrl, timestamp: Date.now() });
+            const videoDataToCache = JSON.stringify({ downloadUri: downloadLink, timestamp: Date.now() });
             localStorage.setItem('resonantEchoes_introVideo', videoDataToCache);
 
             audioService.current.playSound('VIDEO_READY');
